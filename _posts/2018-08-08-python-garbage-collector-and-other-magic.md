@@ -2,7 +2,7 @@
 title: Python garbage collector and the other magic
 published: true
 permalink: "/python-garbage-collector-and-other-magic/"
-bigimg: /img/python_garbage_collection_header.jpeg
+cover-img: /img/python_garbage_collection_header.jpeg
 tags: [python, debugging, garbage collection]
 ---
 
