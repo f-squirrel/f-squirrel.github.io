@@ -552,7 +552,7 @@ footer .footer-custom-content {
 
 .blog-tags span {
   color: {{ site.link-col | default: "#404040" }};
-  opacity: 0.8;
+  /*opacity: 0.8;*/
 }
 
 .blog-tags a {
@@ -560,14 +560,19 @@ footer .footer-custom-content {
   text-decoration: none;
   padding: 0 0.3125rem;
   opacity: 0.8;
-  border: 1px solid transparent;
+  /*border: 1px solid transparent;*/
   border-radius: 0.1875rem;
 }
 
 .blog-tags a:hover {
+  border-radius: 2px;
+  color: {{ site.hover-col }};
+  background-color: #EEE;
+  /*
   opacity: 1;
   color: {{ site.link-col | default: "#404040" }};
   border-color: {{ site.link-col | default: "#404040" }};
+  */
 }
 
 .post-preview .blog-tags {
