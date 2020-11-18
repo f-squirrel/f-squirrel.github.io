@@ -2,6 +2,7 @@
 title: How to contain a crashed container
 published: true
 permalink: "/how-to-contain-a-crashed-container/"
+share-img: /img/docker-logo-696x364.png
 tags: [
     docker,
     signals,

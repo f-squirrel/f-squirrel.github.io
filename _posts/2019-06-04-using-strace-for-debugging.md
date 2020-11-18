@@ -2,6 +2,7 @@
 title: Using strace for debugging
 published: true
 permalink: "/using-strace-for-debugging/"
+share-img: /img/Strace_logo-156x300.png
 tags: [strace, debugging, linux]
 ---
 
