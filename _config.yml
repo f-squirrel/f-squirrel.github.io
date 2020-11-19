@@ -149,6 +149,10 @@ excerpt_length: 50
 # Character used to separate site title and description in HTML document title
 # and RSS feed title
 title-separator: "-"
+#
+# If you want to show a link to an RSS in the footer, add the site description here.
+# If you don't want to show an RSS link, remove the following line.
+#rss-description: A virtual proof that I'm awesome
 
 # Ruby Date Format
 date_format: "%B %-d, %Y"
