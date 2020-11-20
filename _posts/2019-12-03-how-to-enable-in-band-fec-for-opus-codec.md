@@ -2,6 +2,7 @@
 title: How to enable in-band FEC for Opus codec
 published: true
 permalink: "/how-to-enable-in-band-fec-for-opus-codec/"
+share-img: /img/How-to-Test-Packet-Loss-on-Windows.png
 tags: [udp, opus, fec, rtcp, rtp]
 ---
 
