@@ -1,17 +1,5 @@
 <ul class="list-inline text-center footer-links">
 
-{%- if site.rss-description -%}
-  <li class="list-inline-item">
-    <a href="{{ '/feed.xml' | relative_url }}" title="RSS">
-      <span class="fa-stack fa-lg" aria-hidden="true">
-        <i class="fas fa-circle fa-stack-2x"></i>
-        <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
-      </span>
-      <span class="sr-only">RSS</span>
-    </a>
-  </li>
-{%- endif -%}
-
 {%- if site.social-network-links.email -%}
   <li class="list-inline-item">
     <a href="mailto:{{ site.social-network-links.email }}" title="Email me">
@@ -117,6 +105,18 @@
       </span>
       <span class="sr-only">StackOverflow</span>
    </a>
+  </li>
+{%- endif -%}
+
+{%- if site.rss-description -%}
+  <li class="list-inline-item">
+    <a href="{{ '/feed.xml' | relative_url }}" title="RSS">
+      <span class="fa-stack fa-lg" aria-hidden="true">
+        <i class="fas fa-circle fa-stack-2x"></i>
+        <i class="fas fa-rss fa-stack-1x fa-inverse"></i>
+      </span>
+      <span class="sr-only">RSS</span>
+    </a>
   </li>
 {%- endif -%}
 
