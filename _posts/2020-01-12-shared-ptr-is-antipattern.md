@@ -4,6 +4,7 @@ subtitle: In most of the cases
 published: true
 permalink: "/shared-ptr-is-evil/"
 tags: [C++, shared_ptr]
+readtime: true
 ---
 
 ## A bit of history ##

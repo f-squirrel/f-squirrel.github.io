@@ -4,6 +4,7 @@ published: true
 permalink: "/docker-run-exec-and-carriage-return/"
 share-img: /img/docker-logo-696x364.png
 tags: [docker]
+readtime: true
 ---
 
 

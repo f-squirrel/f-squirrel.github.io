@@ -3,6 +3,7 @@ title: The switch from Vim
 published: true
 permalink: "/the-switch-from-vim/"
 tags: [vim, gvim, nvim, neovim, neovim-qt]
+readtime: true
 ---
 
 For the past five years, my go-to text editors have been Vim and [gVim](https://en.wikipedia.org/wiki/Vim_(text_editor)#Interface)/[MacVim](https://macvim-dev.github.io/macvim/).

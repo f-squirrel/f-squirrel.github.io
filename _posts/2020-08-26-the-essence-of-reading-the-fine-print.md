@@ -3,6 +3,7 @@ title: The essence of reading the fine-print
 published: true
 permalink: "/default-non-standard-features/"
 tags: [C++, variable-length array, gcc, clang]
+readtime: true
 ---
 
 I was recently investigating a bug and would like to share an unexpected, yet interesting discovery regarding the cause of the issue.<br>

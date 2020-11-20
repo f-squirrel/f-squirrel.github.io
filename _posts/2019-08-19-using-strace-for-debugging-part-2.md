@@ -4,6 +4,7 @@ published: true
 permalink: "/using-strace-for-debugging-part-2/"
 share-img: /img/Strace_logo-156x300.png
 tags: [strace, debugging, linux]
+readtime: true
 ---
 
 This is the second post about debugging with strace.

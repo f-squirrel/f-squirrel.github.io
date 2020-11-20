@@ -3,6 +3,7 @@ title: Google Docs and C++ 11
 published: true
 permalink: "/google-docs-and-cpp11/"
 tags: [C++, fun]
+readtime: true
 ---
 
 
