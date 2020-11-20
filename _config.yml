@@ -152,7 +152,7 @@ title-separator: "-"
 #
 # If you want to show a link to an RSS in the footer, add the site description here.
 # If you don't want to show an RSS link, remove the following line.
-#rss-description: A virtual proof that I'm awesome
+rss-description: Dmitry Danilov - Tech Blog
 
 # Ruby Date Format
 date_format: "%B %-d, %Y"
