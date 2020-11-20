@@ -858,7 +858,7 @@ pre code {
 }
 
 pre {
-  font-size: 1.025rem;
+  font-size: 0.875rem;
   line-height: 1.5em;
   border-radius: 0.25rem;
   padding: 0.59375rem;
@@ -872,7 +872,7 @@ pre {
 }
 .highlight > pre {
   background-image: linear-gradient(
-    rgba(0,0,0,0.06), rgba(0,0,0,0.06) 1.5em, rgba(0,0,0,0.03) 1.5em, rgba(0,0,0,0.03) 3em);
+    rgba(0,0,0,0.06), rgba(0,0,0,0.06) 1.5em, rgba(0,0,0,0.03) 1.5em, rgba(0,0,0,0.03) 3.0em);
   background-size: auto 3em;
   background-position-y: 0.625rem;
   border: 1px solid rgba(0,0,0,0.1);
