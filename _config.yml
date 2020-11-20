@@ -102,7 +102,7 @@ gtag: "UA-155369174-1"
 # Fill in your Google Analytics ID to track your website using GA
 google_analytics: "UA-155369174-1"
 
-keywords: "linux, c, c++, cpp, gcc, g++, clang, docker, kernel, python, rust, debugging, testkwd"
+keywords: "linux, c, c++, cpp, gcc, g++, clang, docker, kernel, python, rust, debugging"
 # Google Tag Manager ID
 #gtm: ""
 
