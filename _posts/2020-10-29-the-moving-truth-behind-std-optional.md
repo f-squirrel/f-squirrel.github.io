@@ -4,6 +4,7 @@ published: true
 permalink: "/the-state-of-std-optional-after-move/"
 tags: [C++, optional, move]
 share-img: /img/optional.svg
+share-description: Unexpected behavior of std::optional after move
 readtime: true
 ---
 
