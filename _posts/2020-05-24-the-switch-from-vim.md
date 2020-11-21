@@ -2,6 +2,7 @@
 title: The switch from Vim
 published: true
 permalink: "/the-switch-from-vim/"
+share-img: /img/Vimlogo.svg.png
 tags: [vim, gvim, nvim, neovim, neovim-qt]
 readtime: true
 ---
