@@ -261,4 +261,3 @@ remote_theme: daattali/beautiful-jekyll
 plugins:
   - jekyll-paginate
   - jekyll-sitemap
-  - jekyll-sitemap
