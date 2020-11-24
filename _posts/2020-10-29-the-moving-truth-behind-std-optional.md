@@ -4,7 +4,7 @@ published: true
 permalink: "/the-state-of-std-optional-after-move/"
 tags: [C++, optional, move]
 share-title: The "moving" truth behind std::optional
-share-img: /img/optional-mandatory-crop.jpg
+share-img: /img/optional-mandatory-crop.png
 share-description: Unexpected behavior of std::optional after move
 readtime: true
 ---
