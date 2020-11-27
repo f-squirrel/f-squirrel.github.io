@@ -54,13 +54,13 @@ The result is **no carriage return**!
 In case you do need `TTY` but don’t want the carriage return, there are a few options:
 Delete `\r` from the container’s output using [tr](https://linux.die.net/man/1/tr):
 <pre>
-$docker exec -it dev_env echo "Hello" | <span style="background-color: #00CC66">tr -d '\r'</span> | od -c
+$docker exec -it container_name echo "Hello" | <span style="background-color: #00CC66">tr -d '\r'</span> | od -c
 0000000    H   e   l   l   o  \n
 0000006
 </pre>
 Configure the container’s `TTY` to translate newline to carriage return-newline:
 <pre>
-$docker exec -t dev_env /bin/bash -c "<span style="background-color: #00CC66">stty -onlcr</span> && echo 'Hello'" | od -c
+$docker exec -it container_name /bin/bash -c "<span style="background-color: #00CC66">stty -onlcr</span> && echo 'Hello'" | od -c
 0000000    H   e   l   l   o  \n
 0000006
 </pre>
