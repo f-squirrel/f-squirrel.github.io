@@ -29,6 +29,10 @@ run: ## Run Jekyll site
 		${IMAGE_NAME}:latest \
 		bundle exec jekyll serve -H 0.0.0.0
 
+.PHONY: stop
+stop: ## Run Jekyll site
+	docker stop ${CONTAINER_NAME}
+
 .PHONY: bundle
 bundle: ## Install dependencies
 	docker run -it --rm --name=${CONTAINER_NAME} \
