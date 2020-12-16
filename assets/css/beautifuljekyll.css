@@ -882,7 +882,7 @@ pre {
   border: 1px solid rgba(0,0,0,0.1);
   border-left: 0.4375rem solid #444;
 }
-.highlight > pre:not([class~="highlight"]) { /* code block with line number */
+.highlight > pre:not([class~="XYZ"]) { /* code block with line number */
   padding: 0;
 }
 .highlight table,
