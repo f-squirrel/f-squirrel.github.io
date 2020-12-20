@@ -11,7 +11,7 @@ Everything is clear with the exceptions that can be handled, but what do we do w
 
 One of the ways to work with them is to catch, log, and exit the application. Let’s take a look at the following example:
 
-{% highlight c++ linenos %}
+```cpp
 #include <iostream>
 #include <stdexcept>
 
@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
   main_loop_function();
   return 0;
 }
-{% endhighlight %}
+```
 
 The output and exit code are the following:
 <pre>
@@ -110,13 +110,13 @@ But wait, there’s more!
 The preferred methodology of this article is to let the exception remain uncaught and leave it to the top-level code to handle it. 
 In this case, it is the C++ standard library:
 
-{% highlight c++ linenos %}
+```cpp
 void main_loop_function() {
   while (true) {
     do_something();
   }
 }
-{% endhighlight %}
+```
 
 The output:
 <pre>
