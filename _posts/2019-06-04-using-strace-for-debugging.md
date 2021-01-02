@@ -18,15 +18,15 @@ audio for outgoing calls because of system error "Device or resource is busy".
 I noticed it did not happen when the client was answering an incoming call.
 My first impression was that baresip tried to open audio for playing incoming audio twice.
 I tried to find this place in the code but since I was not familiar with the code I did not
-manage to do that. And then I thought of ```strace```.
+manage to do that. And then I thought of `strace`.
 
 <p align="center">
   <img src="/img/Strace_logo-156x300.png" title="Strace logo">
 </p>
 
-```strace ``` is a userspace tool that prints all system calls of a given process.
+`strace` is a userspace tool that prints all system calls of a given process.
 You may start a process inside strace or you can attach it to a running process.
-I ran baresip with strace: ```strace -o strace.log baresip -e 7100```, where:
+I ran baresip with strace: `strace -o strace.log baresip -e 7100`, where:
 
 * -o filename Write the trace output to the file filename rather than to stderr.
 * strace.log is the output log file
@@ -41,7 +41,7 @@ And then I looked for "Device or resource is busy" in the log file.
 
 And as we can see it happens in line 1308. By the way, vim has builtin syntax highlight for strace logs.
 
-So I looked for ```open("/dev/snd/pcmC0D0p", O_RDWR|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC)```.
+So I looked for `open("/dev/snd/pcmC0D0p", O_RDWR|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC)`.
 <p align="center">
   <img src="/img/first_open_call_0.png">
 </p>

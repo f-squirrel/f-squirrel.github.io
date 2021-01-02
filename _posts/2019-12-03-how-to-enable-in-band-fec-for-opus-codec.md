@@ -34,10 +34,10 @@ The encoder needs higher bitrate to have a room for LBRR packets containing FEC.
 
 Here is the example of configuring OPUS encoder.
 
-{% highlight cpp linenos %}
+```c
 opus_encoder_ctl(encoder, OPUS_SET_INBAND_FEC(TRUE));
 opus_encoder_ctl(encoder,OPUS_SET_PACKET_LOSS_PERC(opus_packet_loss));
-{% endhighlight %}
+```
 
 I configure `opus_packet_loss` via config file but it may be configured in realtime.
 For example, you can update OPUS according to [RTCP](https://en.wikipedia.org/wiki/RTP_Control_Protocol)
@@ -49,7 +49,7 @@ The most natural way to know it is to check the sequence number of RTP packets.
 When you know that the previous packet is lost you are supposed to decode the current packet twice:
 first time with FEC turned on to reproduce the lost packet, and then with FEC turned off to decode the current packet.
 
-{% highlight cpp linenos %}
+```c
 /* Decode the lost packet */
 opus_decoder_ctl(decoder, OPUS_GET_LAST_PACKET_DURATION(frame_size));
 opus_decode(	decoder,
@@ -67,7 +67,7 @@ opus_decode(	decoder,
 		frame_size,
 		0);   /* in-band FEC is turned off */
 play_buffer(buffer);
-{% endhighlight %}
+```
 
 ## Summary ##
 
