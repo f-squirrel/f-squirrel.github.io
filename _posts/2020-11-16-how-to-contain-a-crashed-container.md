@@ -25,17 +25,17 @@ containers, I noticed an unexpected exit code when a contained application crash
 a few minutes left for Futurama to finish downloading, I created a sample application in order to investigate this
 sorcery:
 
-{% highlight c++ linenos %}
+```cpp
 #include <cstdlib>
 
 int main() {
     std::abort();
     return 0;
 }
-{% endhighlight %}
+```
 
 Dockerfile:
-{% highlight docker linenos %}
+```docker
 FROM ubuntu:18.04
 
 # Install tools
@@ -51,7 +51,7 @@ RUN g++ main.cpp -o app
 
 WORKDIR /
 CMD ["/src/app"]
-{% endhighlight %}
+```
 
 The result once executed:
 <pre>
@@ -69,9 +69,9 @@ termination.
 
 During my research, I was able to find an open [issue](https://github.com/moby/moby/issues/30593) on the `SIGABRT`
 dilemma and a comment with the following workaround using bash:
-{% highlight docker linenos %}
+```docker
 CMD ["bash", "-c", "/src/app ; exit $(echo $?)"]
-{% endhighlight %}
+```
 
 Now, the container returns the correct exit code:
 <pre>

@@ -16,18 +16,18 @@ raw pointer, when used solely to express that a value is indeed optional. The ty
 a contained variable is optional and it is stored by value.
 
 The following is an example of a function that returns a value, if it exists, or null optional:
-{% highlight c++ linenos %}
+```cpp
 std::optional<Object> get();
 
 auto object = get();
 if (object) {
     // Use object
 }
-{% endhighlight %}
+```
 
 Since C++ 11 allows the "movement" of variables, the below demonstrates what happens when `std::optional` is moved:
 
-{% highlight c++ linenos %}
+```cpp
 template <typename T>
 void print(const T &o, const std::string &name) {
     std::cout << name << ".has_value(): "
@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
     print(s2, "s2");
     return 0;
 }
-{% endhighlight %}
+```
 
 Output:
 <pre>
@@ -89,14 +89,15 @@ It is a trivial constructor if std::is_trivially_move_constructible_v<T> is true
 The behavior is perfectly legal in terms of the standard, but can seem illogical from the user's perspective, who would naturally expect the optional to have no value if it has been moved.
 In order to eliminate all doubt, I would suggest to `std::optional::reset` after moving an optional object.<br>
 The reset would call the destructor of the contained object (if the destructor exists) and set the `has_value` flag to `false`.
-{% highlight c++ linenos %}
+
+```cpp
     ...
     i1.reset();
     print(i1, "i1");
     s1.reset();
     print(s1, "s1");
 }
-{% endhighlight %}
+```
 
 Output:
 <pre>
