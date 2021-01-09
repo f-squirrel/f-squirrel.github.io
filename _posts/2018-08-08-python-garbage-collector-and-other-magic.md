@@ -11,7 +11,7 @@ Once upon a time, in the company where I work there was a bug in production that
 
 I was able to locate the class responsible for the issue, it was a class working with os.pipefile descriptors, let’s call it OsPipeHolder. You may find the simplified version of the code below:
 
-{% highlight python linenos %}
+```python
 #Listing #1
 
 #!/usr/bin/python
@@ -43,7 +43,7 @@ class OsPipeHolder(object):
 if __name__ == "__main__":
     pipe = OsPipeHolder()
     del pipe
-{% endhighlight %}
+```
 
 The problem was that the application made a retry in the event of
 failure and created a new instance of ```OsPipeHolder ```class.
@@ -62,7 +62,7 @@ As the reader may know, Python’s garbage collector destroys objects not refere
 Despite we create only one instance of the object in the line #30 and do not copy it elsewhere, I propose to verify the number of references with ```sys.getrefcount```:
 
 
-{% highlight python linenos %}
+```python
 #Listing #2
 
 import os
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     #creates an additional reference
     print "Refcount:", (sys.getrefcount(pipe) -1)               
     del pipe
-{% endhighlight %}
+```
 
 Run results #2:
 <pre>
@@ -88,7 +88,7 @@ As you see, every time we create an instance of ```OsPipeHolder``` Python create
 So, maybe there is an internal reference inside the object itself.
 
 In order to check it I have decided to print the information on all the attributes of ```OsPipeHolder```:
-{% highlight python linenos %}
+```python
 #Listing #3
 
 #!/usr/bin/python
@@ -108,7 +108,7 @@ if __name__ == "__main__":
             print msg
 
     del(pipe)
-{% endhighlight %}
+```
 
 Run results #3:
 <pre>
@@ -126,7 +126,7 @@ At first glance everything looks good, but in the line #22 we see that ```isClos
 This is the inner reference cycle we were looking for!
 
 Let’s comment it out:
-{% highlight python linenos %}
+```python
 #Listing #4
 
 #!/usr/bin/python
@@ -140,7 +140,7 @@ class OsPipeHolder(object):
         self._write = os.fdopen( write, "w" )
         #self.isClosed = self.is_closed
 ...
-{% endhighlight %}
+```
 
 Run results #4:
 ```
@@ -158,7 +158,7 @@ But we still have two issues:
 Let’s start with the first.<br>
 I found the solution in Python sources.
 In order to create an alias to a function you simply declare ```isClosed``` as a "class level attribute"(line #16).
-{% highlight python linenos %}
+```python
 #Listing #5
 
 #!/usr/bin/python
@@ -191,7 +191,7 @@ if __name__ == "__main__":
     pipe = OsPipeHolder()
     print "Refcount:", (sys.getrefcount(pipe) -1)
     del(pipe)
-{% endhighlight %}
+```
 
 Run results #5:
 <pre>

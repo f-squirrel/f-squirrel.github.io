@@ -10,7 +10,7 @@ readtime: true
 I was recently investigating a bug and would like to share an unexpected, yet interesting discovery regarding the cause of the issue.<br>
 In order to provide an idea of what I was working on, consider the following code as a simplified representation:
 
-{% highlight c++ linenos %}
+```cpp
 void read_to_buffer(std::size_t size) {
     char buffer[size];
     std::memset(buffer, 0, size);
@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
     read_to_buffer(size);
     return 0;
 }
-{% endhighlight %}
+```
 
 In my case, the code was working perfectly, until the `size` was changed somewhere deep in the configuration. After that, it started to crash due to a segmentation fault, as the code was trying to allocate too much memory on stack. The solution is to simply allocate the memory on heap. Fortunately, C++ provides plenty of options, such as `std::vector v(size)`, `std::string s(size, 0)`, `std::unique_ptr(new char[size])`, and so forth.
 
