@@ -2,7 +2,7 @@
 title: Let it explode!
 published: true
 permalink: "/let-it-explode/"
-tags: [C++, exceptions, gdb, debugging]
+tags: [cpp, exceptions, gdb, debugging]
 readtime: true
 ---
 

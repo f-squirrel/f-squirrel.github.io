@@ -3,7 +3,7 @@ title: The essence of reading the fine-print
 published: true
 permalink: "/default-non-standard-features/"
 share-img: /img/fine-print.png
-tags: [C++, variable-length array, gcc, clang]
+tags: [cpp, variable-length array, gcc, clang]
 readtime: true
 ---
 

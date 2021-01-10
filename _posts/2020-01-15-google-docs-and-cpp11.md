@@ -2,7 +2,7 @@
 title: Google Docs and C++ 11
 published: true
 permalink: "/google-docs-and-cpp11/"
-tags: [C++, fun]
+tags: [cpp, fun]
 share-img: /img/Google-Docs-Header-1280x720-1.png
 readtime: true
 ---
