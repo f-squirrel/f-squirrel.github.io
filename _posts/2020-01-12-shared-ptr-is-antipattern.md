@@ -3,7 +3,7 @@ title: std::shared_ptr is an anti-pattern
 subtitle: In most of the cases
 published: true
 permalink: "/shared-ptr-is-evil/"
-tags: [C++, shared_ptr]
+tags: [cpp, shared_ptr]
 readtime: true
 ---
 

@@ -2,7 +2,7 @@
 title: Implementations of std::async and how they might Affect Applications
 published: true
 permalink: "/std-async-implementations/"
-tags: [C++, async]
+tags: [cpp, async]
 readtime: true
 ---
 
