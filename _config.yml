@@ -106,7 +106,7 @@ google_analytics: "UA-155369174-1"
 
 keywords: "linux, c, c++, cpp, gcc, g++, clang, docker, kernel, python, rust, debugging"
 # Google Tag Manager ID
-#gtm: ""
+gtm: "GTM-T8QVS29"
 
 # Matomo (aka Piwik) Web statistics
 # Uncomment the following section to enable Matomo. The opt-out parameter controls
