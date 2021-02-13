@@ -147,6 +147,3 @@ Glibc (libc-2.27.so) that tried to execute the `HLT` instruction.
 Unless your application has user-defined signal handlers, it is strongly advised and encouraged to run a
 container with the `--init` flag as a safety measure, as this tiny docker-implemented init process will enable default signal handling for
 your application and reap zombie processes.
-
-
-Please leave comments on [Twitter](https://twitter.com/dbdanilov/status/1345410839189315585).

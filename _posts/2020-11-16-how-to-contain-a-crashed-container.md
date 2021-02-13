@@ -96,5 +96,3 @@ $ docker run --init --name test sigabort_test:latest ; echo $?
 
 P.S. `docker-compose` also [supports](https://docs.docker.com/compose/compose-file/#init) the init flag from version 3.7
 and onward.
-
-Please leave comments on [Twitter](https://twitter.com/dbdanilov/status/1328270769563062273).
