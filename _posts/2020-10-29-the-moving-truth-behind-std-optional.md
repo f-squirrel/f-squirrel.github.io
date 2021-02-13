@@ -108,5 +108,3 @@ s1.has_value(): false
 
 P.S.
 Thanks to [Petar Ivanov](https://www.linkedin.com/in/petar-ivanov-37840224/) for the idea and [Rina Volovich](https://www.linkedin.com/in/rina-volovich/) for editing.
-
-Please leave comments on [Twitter](https://twitter.com/dbdanilov/status/1321880543315845122).
