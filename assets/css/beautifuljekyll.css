@@ -551,7 +551,8 @@ footer .footer-custom-content {
 }
 
 .blog-tags span {
-  color: {{ site.link-col | default: "#404040" }};
+  color: #8999A8;
+  /*color: #75838f{{ site.link-col | default: "#404040" }};*/
   /*opacity: 0.8;*/
 }
 
