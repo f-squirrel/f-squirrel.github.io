@@ -35,36 +35,29 @@ I ran baresip with strace: `strace -o strace.log baresip -e 7100`, where:
 
 And then I looked for "Device or resource is busy" in the log file.
 
-<p align="center">
-  <img src="/img/strace_problematic_open_call.png">
-</p>
+![](/img/strace_problematic_open_call.png)
 
 And as we can see it happens in line 1308. By the way, vim has builtin syntax highlight for strace logs.
 
 So I looked for `open("/dev/snd/pcmC0D0p", O_RDWR|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC)`.
-<p align="center">
-  <img src="/img/first_open_call_0.png">
-</p>
+
+![](/img/first_open_call_0.png)
 
 As you see the open returns file descriptor "14". So let's look whether baresip closes the file descriptor:
-<p align="center">
-  <img src="/img/close_14.png">
-</p>
+
+![](/img/close_14.png)
 
 Next open call:
-<p align="center">
-  <img src="/img/second_open_call.png">
-</p>
+
+![](/img/second_open_call.png)
 
 And the corresponding close call in line 1484:
-<p align="center">
-  <img src="/img/second_close_call.png">
-</p>
+
+![](/img/second_close_call.png)
 
 And if you still follow me here is the next open call:
-<p align="center">
-  <img src="/img/third_open_call.png">
-</p>
+
+![](/img/third_open_call.png)
 
 So as you may see the next open function call happens in line 1308 while close is called in line 1484.
 Meaning baresip opens the audio device before closing it.
@@ -73,9 +66,8 @@ Looks like we found out the problematic function calls!
 As far as I understand baresip opens the audio device to play
 incoming audio but why does it open it before? So let's take a look at what happens around the second open call. In line 1120 we see that baresip opens and then reads ringback.wav file which is
 a ringback tone, the audible ringing that is heard by the calling party after dialing:
-<p align="center">
-  <img src="/img/open_ringback_file_epoll_wait.png">
-</p>
+
+![](/img/open_ringback_file_epoll_wait.png)
 
 And after that, it obviously opens the audio device in order to play the file.
 And while the audio device is playing the ringtone another thread receives a response

@@ -71,12 +71,9 @@ Finally, I can use a single GUI for both operating systems!
 #### Screenshots: ####
 
 Local macOS environment:
-<p align="center">
-  <img src="/img/neovim-qt-local.png">
-</p>
 
+![Local macOS](/img/neovim-qt-local.png)
 
 Connected to a remote instance:
-<p align="center">
-  <img src="/img/neovim-qt-remote.png">
-</p>
+
+![Remote connection](/img/neovim-qt-remote.png)
