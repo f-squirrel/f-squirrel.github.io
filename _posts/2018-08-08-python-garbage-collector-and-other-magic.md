@@ -207,9 +207,7 @@ As you see, we have only one reference to the instance and the garbage collector
 But why isn’t it called in the original code?
 Let's take a look at the memory layout of our object:
 
-<p align="center">
-  <img src="/img/mem_layout.jpeg" title="Memory layout">
-</p>
+![Memory layout](/img/mem_layout.jpeg)
 
 As you see we have one reference(Ref #1) to the object from the stack and another inner reference (Ref #2).
 After the Ref #1 is deleted and we have no other references from the stack the garbage collector is supposed to call the `__del__` method despite the inner reference.

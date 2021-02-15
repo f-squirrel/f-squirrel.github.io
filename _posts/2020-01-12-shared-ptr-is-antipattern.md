@@ -133,11 +133,7 @@ It looks almost the same but this code makes __only one allocation of a contiguo
 the stored object and the reference counter__.
 The picture below shows the difference in the memory layout of shared pointers created in the two ways.
 
-
-<p align="center">
-  <img src="/img/shared_ptr_memory_map.png" title="Shared pointer memry layout">
-</p>
-
+![Shared pointer memory layout](/img/shared_ptr_memory_map.png)
 
 Let us check the memory allocation with the following simple code:
 ```cpp
