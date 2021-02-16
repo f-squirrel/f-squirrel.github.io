@@ -35,29 +35,29 @@ I ran baresip with strace: `strace -o strace.log baresip -e 7100`, where:
 
 And then I looked for "Device or resource is busy" in the log file.
 
-![](/img/strace_problematic_open_call.png)
+![strace](/img/strace_problematic_open_call.png)
 
 And as we can see it happens in line 1308. By the way, vim has builtin syntax highlight for strace logs.
 
 So I looked for `open("/dev/snd/pcmC0D0p", O_RDWR|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC)`.
 
-![](/img/first_open_call_0.png)
+![strace](/img/first_open_call_0.png)
 
 As you see the open returns file descriptor "14". So let's look whether baresip closes the file descriptor:
 
-![](/img/close_14.png)
+![strace](/img/close_14.png)
 
 Next open call:
 
-![](/img/second_open_call.png)
+![strace](/img/second_open_call.png)
 
 And the corresponding close call in line 1484:
 
-![](/img/second_close_call.png)
+![strace](/img/second_close_call.png)
 
 And if you still follow me here is the next open call:
 
-![](/img/third_open_call.png)
+![strace](/img/third_open_call.png)
 
 So as you may see the next open function call happens in line 1308 while close is called in line 1484.
 Meaning baresip opens the audio device before closing it.
@@ -67,7 +67,7 @@ As far as I understand baresip opens the audio device to play
 incoming audio but why does it open it before? So let's take a look at what happens around the second open call. In line 1120 we see that baresip opens and then reads ringback.wav file which is
 a ringback tone, the audible ringing that is heard by the calling party after dialing:
 
-![](/img/open_ringback_file_epoll_wait.png)
+![strace](/img/open_ringback_file_epoll_wait.png)
 
 And after that, it obviously opens the audio device in order to play the file.
 And while the audio device is playing the ringtone another thread receives a response

@@ -74,7 +74,7 @@ This example portrays how `std::move` does not change the state of `optional` if
 string contained in `s1`) but `s1` still `has_value`.<br>
 The following visuals illustrate the various states of `std::optional<std::string>` discussed thus far.
  
-![](/img/optional.svg)
+![std::optional layout](/img/optional.svg)
 
 [cppreference.com](https://en.cppreference.com/w/cpp/utility/optional/optional) provides a clear explanation of the behavior:
 > Move constructor: If other contains a value, initializes the contained value as if direct-initializing (but not
