@@ -3,6 +3,7 @@ title: How signals are handled in a docker container
 published: true
 permalink: "/how-signals-are-handled-in-a-docker-container"
 share-img: /img/docker-logo-696x364.png
+share-description: "Deep dive into the mechanism of signal handling in docker containers"
 tags: [docker, libc, linux, signals, sigsegv, sigabrt, c, kernel, init]
 readtime: true
 ---

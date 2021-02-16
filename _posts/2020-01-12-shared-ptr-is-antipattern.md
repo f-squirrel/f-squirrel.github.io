@@ -3,6 +3,7 @@ title: std::shared_ptr is an anti-pattern
 subtitle: In most of the cases
 published: true
 permalink: "/shared-ptr-is-evil/"
+share-description: "Nuances of the implementation of std::shared_ptr, its drawback, and best practices"
 tags: [cpp, shared_ptr]
 readtime: true
 ---

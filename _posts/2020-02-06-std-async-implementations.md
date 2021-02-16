@@ -3,6 +3,7 @@ title: Implementations of std::async and how they might Affect Applications
 published: true
 permalink: "/std-async-implementations/"
 tags: [cpp, async]
+share-description: "Description of major implementations of std::async, when it uses thread pool and when does not"
 readtime: true
 ---
 
