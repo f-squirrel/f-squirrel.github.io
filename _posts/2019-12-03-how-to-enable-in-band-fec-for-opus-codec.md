@@ -13,7 +13,7 @@ is usually solved with [forward error correction](https://en.wikipedia.org/wiki/
 The idea is to add some redundant data to a message or messages so that if one of the messages is lost, a receiver could
 replicate it form combination other messages and the redundant data. This redundant data is called FEC.
 
-![](/img/How-to-Test-Packet-Loss-on-Windows.png)
+![Packet loss image](/img/How-to-Test-Packet-Loss-on-Windows.png)
 
 A developer is supposed to decide how much FEC to add to the messages at the encoder side and how to decode
 it at the decoder side. It sounds like a piece of work!

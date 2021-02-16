@@ -12,7 +12,7 @@ Recently, I was writing a script whose function was to retrieve and parse a list
 The script was based on another script that did the same by `ssh`-ing to a remote server.
 However, my `grep/sed/awk` command set did not work despite the printed output in the terminal looked identical to the one from the original script.
 
-![](/img/docker-logo-696x364.png)
+![docker logo](/img/docker-logo-696x364.png)
 
 This is a simplified version of the command:
 <pre>
