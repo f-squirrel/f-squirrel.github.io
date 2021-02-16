@@ -3,6 +3,7 @@ title: The essence of reading the fine-print
 published: true
 permalink: "/default-non-standard-features/"
 share-img: /img/fine-print.png
+share-description: "Tips on how to make your compiler strictly follow the C++ standard"
 tags: [cpp, variable-length array, gcc, clang]
 readtime: true
 ---
