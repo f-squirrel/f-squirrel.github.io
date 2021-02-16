@@ -64,13 +64,11 @@ layout: base
         {% include social-share.html %}
       {% endif %}
 
-<div class="seeAlso">
-<h3>See also</h3>
-<ul>
-
+<!--See Also section-->
 {% assign maxRelated = 5 %}
 {% assign minCommonTags =  1 %}
 {% assign maxRelatedCounter = 0 %}
+{% assign relatedPosts = "" | split: ',' %}
 
   {% for post in site.posts %}
 
@@ -88,19 +86,29 @@ layout: base
     {% endfor %}
 
     {% if sameTagCount >= minCommonTags %}
-      <li>
-      <a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a>
-      </li>
+      <!--<li>-->
+      <!--<a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a>-->
+      <!--</li>-->
+      {% assign relatedPosts = relatedPosts | push: post %}
       {% assign maxRelatedCounter = maxRelatedCounter | plus: 1 %}
       {% if maxRelatedCounter >= maxRelated %}
         {% break %}
       {% endif %}
     {% endif %}
-
   {% endfor %}
-</ul>
-</div>
 
+{% if relatedPosts.size > 0%}
+    <div class="seeAlso">
+    <h3>See also</h3>
+    <ul>
+        {% for post in relatedPosts %}
+          <li>
+          <a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a>
+          </li>
+        {% endfor %}
+    </ul>
+    </div>
+{% endif %}
 
       <ul class="pagination blog-pager">
         {% if page.previous.url %}
