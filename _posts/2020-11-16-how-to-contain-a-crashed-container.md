@@ -95,5 +95,5 @@ $ docker run --init --name test sigabort_test:latest ; echo $?
 <span style="background-color: #00FF00">134</span>
 </pre>
 
-P.S. `docker-compose` also [supports](https://docs.docker.com/compose/compose-file/#init) the init flag from version 3.7
-and onward.
+P.S. `docker-compose` also [supports](https://docs.docker.com/compose/compose-file/compose-file-v2/#init) the init flag
+from version 2.4 and onward.
