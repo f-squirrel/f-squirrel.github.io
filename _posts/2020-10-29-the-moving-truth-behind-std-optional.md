@@ -105,5 +105,4 @@ i1.has_value(): false
 s1.has_value(): false
 </pre>
 
-P.S.
-Thanks to [Petar Ivanov](https://www.linkedin.com/in/petar-ivanov-37840224/) for the idea and [Rina Volovich](https://www.linkedin.com/in/rina-volovich/) for editing.
+*Special thanks to [Petar Ivanov](https://www.linkedin.com/in/petar-ivanov-37840224/) for the idea and [Rina Volovich](https://www.linkedin.com/in/rina-volovich/) for editing.*
