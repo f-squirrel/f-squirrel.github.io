@@ -22,6 +22,7 @@ on a few of the differences between `panic!` and `abort` that I have personally 
 Let us start with a simple program that immediately 'panics' when it is run:
 ```rust
 fn main() {
+    panic!("Panic in the main thread!");
     println!("Hello, world!");
 }
 ```
@@ -31,7 +32,7 @@ configured via an environment variable to show its backtrace (stack unwinding).
 ```plain
 $ cargo run
 Hello, world!
-thread 'main' panicked at 'Panic in the main thread!', src/main.rs:19:5
+thread 'main' panicked at 'Panic in the main thread!', src/main.rs:2:5
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ```
 
