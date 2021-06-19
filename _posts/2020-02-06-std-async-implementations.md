@@ -39,7 +39,7 @@ There are two launch policies, which define whether a function is launched in a 
 * If the `deferred` flag is set, a callable function will be stored together with its arguments, but the
 `std::async` function __will not launch a new thread__. Moreover, the callable function will be executed if either
 `future::get()` or `future::wait()` is called.
-* If both flags are set, it is up to the implementation to decide which policy to choose.
+* If neither of flags is set, it is up to the implementation to decide which policy to choose.
 
 
 ## In Essence, what is the Default Policy? ##
