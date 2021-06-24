@@ -97,3 +97,8 @@ $ docker run --init --name test sigabort_test:latest ; echo $?
 
 P.S. `docker-compose` also [supports](https://docs.docker.com/compose/compose-file/compose-file-v2/#init) the init flag
 from version 2.4 and onward.
+
+_For a detailed explanation on signal handling in docker, please have a look at
+my next article [How signals are handled in a docker
+container](/how-signals-are-handled-in-a-docker-container)._
+
