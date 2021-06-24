@@ -1,5 +1,5 @@
 ---
-title: The essence of reading the fine-print
+title: How I solved a bug by disabling C++ extensions
 published: true
 permalink: "/default-non-standard-features/"
 share-img: /img/fine-print.png
