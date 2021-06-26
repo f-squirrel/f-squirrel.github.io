@@ -79,8 +79,7 @@ $ docker run \
 ```
 
 * `--init` - to ensure [proper signal](/how-signals-are-handled-in-a-docker-container) handling in the container.
-* `--ulimit core=-1` - set core dump size to unlimited for the processes running in the container. Alternatively, it can
-be set globally at the host with [ulimit](https://docs.oracle.com/cd/E19683-01/816-0210/6m6nb7mo3/index.html).
+* `--ulimit core=-1` - set core dump size to unlimited for the processes running in the container.
 * `--mount type=bind,source=/tmp/,target=/tmp/` - mount host's tmp directory to the container’s tmp so that cores
 generated in the container remain available after the container is stopped or deleted.<br>
 *It is important to note that the `source` path has to be the path
