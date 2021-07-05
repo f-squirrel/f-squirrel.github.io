@@ -50,7 +50,7 @@ int main() {
 }
 ```
 
-The Dockerfile presented below will be used to build the image for our sample application is very simple: it installs
+The Dockerfile presented below will be used to build the image for our sample application: it installs
 the build-essentials, GDB (needed for future use), copies source code, and builds the application.
 ```docker
 FROM ubuntu:18.04
