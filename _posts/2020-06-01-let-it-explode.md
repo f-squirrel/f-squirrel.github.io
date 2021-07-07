@@ -52,7 +52,7 @@ The problem faced by a developer is that there is no possibility of checking the
 Moreover, the exit code looks like the exit was expected, which is not the case!
 It seems that we have come across an exception that we are not able to handle.
 
-How can we improve the situation? After logging the exception, we can replace `std::exit(1)` with `std::abort`:
+How can we improve the situation? After logging the exception, we can replace `std::exit(1)` with `std::abort()`:
 <pre>
 FATAL ERROR: Fatal error occured!
 [1]    41070 abort (core dumped)  ./a.out
