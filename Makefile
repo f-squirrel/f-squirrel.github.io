@@ -1,6 +1,6 @@
 JEKYLL_VERSION:=3.9.0
-IMAGE_NAME:=ddanilov.me
-CONTAINER_NAME:=${IMAGE_NAME}
+IMAGE_NAME:=fsquirrel/ddanilov.me
+CONTAINER_NAME:=ddanilov.me
 
 .PHONY: help
 help: ## The Makefile helps to build Concord-BFT in a docker container
