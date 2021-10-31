@@ -5,7 +5,7 @@ tags: [c, cpp, docker, make, build]
 share-img: /img/docker-logo-696x364.png
 readtime: true
 permalink: "/dockerized-cpp-build"
-share-description: The complete guide to implementating C/C++ builds in docker
+share-description: The complete guide on implementing Docker-based builds for C/C++ projects
 ---
 
 In this post, I will share how to create a docker-based build environment for C and C++ projects targeted for Linux.
