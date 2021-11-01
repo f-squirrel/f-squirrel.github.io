@@ -78,7 +78,7 @@ What else can be done?
 
 `std:: terminate` can be used instead of `std::abort`.
 The difference is that `std::abort` causes abnormal program termination unless `SIGABRT` is caught by a signal handler,
-while `terminate` calls [terminate_handler](https://en.cppreference.com/w/cpp/error/terminate_handler), which, by default, calls `std::abort`. 
+while `terminate` calls [terminate_handler](https://en.cppreference.com/w/cpp/error/terminate_handler){:target="_blank"}, which, by default, calls `std::abort`. 
 Let us see the output of the program via `terminate`:
 <pre>
 FATAL ERROR: Fatal error occured!

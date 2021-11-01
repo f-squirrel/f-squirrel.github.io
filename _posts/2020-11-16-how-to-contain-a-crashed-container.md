@@ -61,14 +61,14 @@ $ docker run --name test sigabort_test:latest ; echo $?
 <span style="background-color: #FFFF00">139</span>
 </pre>
 In Unix-like operating systems, if a process is terminated with a signal, the exit code is the result of `128` + the
-signal number[[1]](https://tldp.org/LDP/abs/html/exitcodes.html). In the example above, the exit code is `139 = 128 +
+signal number[[1]](https://tldp.org/LDP/abs/html/exitcodes.html){:target="_blank"}. In the example above, the exit code is `139 = 128 +
 11`, where `11` represents `SIGSEGV` (segmentation fault) instead of `134 = 128 + 6` which is `SIGABRT` (abort).
 
 Most users are generally only interested in knowing whether the application works, which they check and confirm when the
 exit code is `0`.  For debugging purposes, however, it is very useful to understand the cause of an unexpected
 termination.
 
-During my research, I was able to find an open [issue](https://github.com/moby/moby/issues/30593) on the `SIGABRT`
+During my research, I was able to find an open [issue](https://github.com/moby/moby/issues/30593){:target="_blank"} on the `SIGABRT`
 dilemma and a comment with the following workaround using bash:
 ```docker
 CMD ["bash", "-c", "/src/app ; exit $(echo $?)"]
@@ -82,7 +82,7 @@ bash: line 1:     6 Aborted                 /src/app
 </pre>
 
 Another way, which can be considered the correct method, is to solve the problem by adding the `--init`
-[flag](https://docs.docker.com/engine/reference/run/#specify-an-init-process). This indicates that an [init
+[flag](https://docs.docker.com/engine/reference/run/#specify-an-init-process){:target="_blank"}. This indicates that an [init
 process](https://en.wikipedia.org/wiki/Init) should be used as the PID 1 in the container. Specifying the init process
 ensures that the usual responsibilities of an init system, such as reaping zombie processes and default signal handling,
 are performed inside of the created container.
@@ -95,7 +95,7 @@ $ docker run --init --name test sigabort_test:latest ; echo $?
 <span style="background-color: #00FF00">134</span>
 </pre>
 
-P.S. `docker-compose` also [supports](https://docs.docker.com/compose/compose-file/compose-file-v2/#init) the init flag
+P.S. `docker-compose` also [supports](https://docs.docker.com/compose/compose-file/compose-file-v2/#init){:target="_blank"} the init flag
 from version 2.4 and onward.
 
 _For a detailed explanation on signal handling in docker, please have a look at

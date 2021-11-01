@@ -10,9 +10,9 @@ readtime: true
 
 ## A bit of history ##
 The first time a shared pointer was introduced in boost library in the year of 1999.
-Even before [boost had release numbers](https://www.boost.org/users/history/old_versions.html)!
+Even before [boost had release numbers](https://www.boost.org/users/history/old_versions.html){:target="_blank"}!
 Back then the only alternative standard C++ could provide with was `std::auto_ptr`.
- It was so bad that it was rarely used, [got deprecated in C++ 11](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3242.pdf) and [was eventually removed in C++ 17](https://en.cppreference.com/w/cpp/memory/auto_ptr).
+ It was so bad that it was rarely used, [got deprecated in C++ 11](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3242.pdf){:target="_blank"} and [was eventually removed in C++ 17](https://en.cppreference.com/w/cpp/memory/auto_ptr){:target="_blank"}.
 So the only way to have a nice smart pointer in C++ 98/03 was to use `boost::shared_ptr`.
 In C++ 11 `boost::shared_ptr` finally made it to the standard library.
 
@@ -37,7 +37,7 @@ deallocation because at some point it happens automatically. It is awesome, isnâ
 In order to satisfy thread-safety requirements, the reference counter is usually implemented as atomic. So every time a
 shared pointer is passed by value its atomic counter is incremented and decremented.
 Obviously, an incrementation of the atomic counter is [relatively
-expensive](https://stackoverflow.com/questions/32591204/how-expensive-are-atomic-operations).
+expensive](https://stackoverflow.com/questions/32591204/how-expensive-are-atomic-operations){:target="_blank"}.
 
 This issue may be addressed by *passing shared pointers by const reference*. Thus, you do not increment/decrement the counter and save CPU cycles. Letâ€™s see the difference in performance by running the following code:
 ```cpp
@@ -212,7 +212,7 @@ test_make_shared
 
 
 As you may see there are **200,003 allocs** while using constructor versus **100,003 allocs** with `std::make_shared`.
-[More info about `std::make_shared`](https://en.cppreference.com/w/cpp/memory/shared_ptr/make_shared)
+[More info about `std::make_shared`](https://en.cppreference.com/w/cpp/memory/shared_ptr/make_shared){:target="_blank"}
 
 
 ## Reference cycles ##
@@ -305,7 +305,7 @@ dtor ~A_
 dtor ~B_
 </pre>
 
-[More info about `std::weak_ptr`](https://en.cppreference.com/w/cpp/memory/weak_ptr)
+[More info about `std::weak_ptr`](https://en.cppreference.com/w/cpp/memory/weak_ptr){:target="_blank"}
 
 ## `std::make_shared` together with `std::weak_ptr` ##
 So now we know that `std::make_shared` saves memory allocation and `std::weak_ptr` may prevent reference cycles.
@@ -387,7 +387,7 @@ As you see the destructors are called and the weak pointer received from functio
 the variable `A_::str` is still available by its original address(`0x7fc71ec01878`). How come???
 
 
-Here is the explanation from [cppreference.com](https://en.cppreference.com/w/cpp/memory/shared_ptr/make_shared):
+Here is the explanation from [cppreference.com](https://en.cppreference.com/w/cpp/memory/shared_ptr/make_shared){:target="_blank"}:
 > If any std::weak_ptr references the control block created by std::make_shared after the lifetime of all shared owners
 > ended, the memory occupied by T persists until all weak owners get destroyed as well, which may be undesirable if
 > sizeof(T) is large.

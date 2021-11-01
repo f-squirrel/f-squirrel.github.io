@@ -20,7 +20,7 @@ $docker exec -it container_name echo "Hello”
 Hello
 </pre>
 As you may see, the output looks very normal. I decided to print the output with C-styled escaped characters using the
-[od](https://man7.org/linux/man-pages/man1/od.1.html) utility:
+[od](https://man7.org/linux/man-pages/man1/od.1.html){:target="_blank"} utility:
 <pre>
 $docker exec -it container_name echo "Hello" | od -c
 0000000    H   e   l   l   o  \r  \n
@@ -50,7 +50,7 @@ $docker exec container_name echo "Hello" | od -c
 The result is **no carriage return**!
 
 In case you do need `TTY` but don’t want the carriage return, there are a few options:
-Delete `\r` from the container’s output using [tr](https://linux.die.net/man/1/tr):
+Delete `\r` from the container’s output using [tr](https://linux.die.net/man/1/tr){:target="_blank"}:
 <pre>
 $docker exec -it container_name echo "Hello" | <span style="background-color: #00CC66">tr -d '\r'</span> | od -c
 0000000    H   e   l   l   o  \n

@@ -45,7 +45,7 @@ There are two launch policies, which define whether a function is launched in a 
 ## In Essence, what is the Default Policy? ##
 
 Let us understand which policy is the default in the major implementations of the C++ standard library.<br>
-In **GCC**, the [default option](https://github.com/gcc-mirror/gcc/blob/a1c9c9ff06ab15e697d5bac6ea6e5da2df840cf5/libstdc%2B%2B-v3/include/std/future) is `launch::async|launch::deferred`:
+In **GCC**, the [default option](https://github.com/gcc-mirror/gcc/blob/a1c9c9ff06ab15e697d5bac6ea6e5da2df840cf5/libstdc%2B%2B-v3/include/std/future){:target="_blank"} is `launch::async|launch::deferred`:
 
 ```cpp
 /// async, potential overload
@@ -97,7 +97,7 @@ In actuality, the chosen policy will be  `launch::async` (lines 11 and 27):
 ```
 
 <br>
-[**LLVM**](https://github.com/llvm-mirror/libcxx/blob/78d6a7767ed57b50122a161b91f59f19c9bd0d19/include/future)
+[**LLVM**](https://github.com/llvm-mirror/libcxx/blob/78d6a7767ed57b50122a161b91f59f19c9bd0d19/include/future){:target="_blank"}
  has a special launch policy, `launch::any`, for the default option:
 
 ```cpp
@@ -153,7 +153,7 @@ async(launch __policy, _Fp&& __f, _Args&&... __args)
 ```
 
 <br>
-The same can be concluded for [**MSVC's**](https://github.com/microsoft/STL/blob/b3504262fe51b28ca270aa2e05146984ef758428/stl/inc/future) default policy:
+The same can be concluded for [**MSVC's**](https://github.com/microsoft/STL/blob/b3504262fe51b28ca270aa2e05146984ef758428/stl/inc/future){:target="_blank"} default policy:
 
 ```cpp
 template <class _Ret, class _Fty>
@@ -176,7 +176,7 @@ which is `launch::async`.**
 
 If the default option is used, it is unknown which policy will be chosen. “So what? The compiler knows better!” you may
 say.<br> But what will happen if a callable function locks mutexes or stores variables with the
-[_thread_local_](https://en.cppreference.com/w/cpp/keyword/thread_local) storage duration?
+[_thread_local_](https://en.cppreference.com/w/cpp/keyword/thread_local){:target="_blank"} storage duration?
 A change in the default mode might then affect your application dramatically.
 If the default policy is changed from `async` to `deferred`,
 * The `thread_local` variables will use the values from the previous executions of a callable function.
@@ -261,8 +261,8 @@ public:
 ```
 
 `::Concurrency::create_task` is part of [Microsoft’s Parallel Patterns
-Library](https://docs.microsoft.com/en-us/cpp/parallel/concrt/parallel-patterns-library-ppl?view=vs-2019).
-According to [MSDN](https://docs.microsoft.com/en-us/cpp/parallel/concrt/task-parallelism-concurrency-runtime?view=vs-2019),
+Library](https://docs.microsoft.com/en-us/cpp/parallel/concrt/parallel-patterns-library-ppl?view=vs-2019){:target="_blank"}.
+According to [MSDN](https://docs.microsoft.com/en-us/cpp/parallel/concrt/task-parallelism-concurrency-runtime?view=vs-2019){:target="_blank"},
 _the `task` class uses the **Windows ThreadPool** as its scheduler, not the Concurrency Runtime_.
 <br>
 I assume that Microsoft engineers decided to use the thread pool because thread creation is a relatively heavy
