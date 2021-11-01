@@ -138,7 +138,7 @@ After the image is built, we can eventually build the project. First, we need to
 
 ```plain
 $ cd project
-$ docker run -it -rm --name=example \
+$ docker run -it --rm --name=example \
 	--mount type=bind,source=${PWD},target=/src \
 	example/example_build:0.1 \
 	bash
