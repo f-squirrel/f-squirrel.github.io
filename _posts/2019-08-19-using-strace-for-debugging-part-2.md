@@ -68,4 +68,4 @@ $cat /proc/sys/fs/pipe-max-size
 </pre>
 The default value for this file is 1048576 (1 MiB)
 
-<http://man7.org/linux/man-pages/man7/pipe.7.html>
+[http://man7.org/linux/man-pages/man7/pipe.7.html](http://man7.org/linux/man-pages/man7/pipe.7.html){:target="_blank"}

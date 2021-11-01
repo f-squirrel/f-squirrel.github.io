@@ -10,7 +10,7 @@ readtime: true
 
 As a reader may know UDP network protocol does not support either message retransmission or acknowledge.  It means that
 all these problems are supposed to be handled at the application level.  In audio/video transmission domain the problem
-is usually solved with [forward error correction](https://en.wikipedia.org/wiki/Forward_error_correction) technique.
+is usually solved with [forward error correction](https://en.wikipedia.org/wiki/Forward_error_correction){:target="_blank"} technique.
 The idea is to add some redundant data to a message or messages so that if one of the messages is lost, a receiver could
 replicate it form combination other messages and the redundant data. This redundant data is called FEC.
 
@@ -23,7 +23,7 @@ So Opus codec developers decided to make our life easier and added in-band FEC s
 In order to make OPUS encoder to add FEC a user has to set the following configuration:
 
 * Packet time(`ptime`) has to be not less than 10ms otherwise OPUS works in the
-[CELT](https://en.wikipedia.org/wiki/CELT) mode and not in [SILK](https://en.wikipedia.org/wiki/SILK).
+[CELT](https://en.wikipedia.org/wiki/CELT){:target="_blank"} mode and not in [SILK](https://en.wikipedia.org/wiki/SILK){:target="_blank"}.
 * Don't use very high bitrates. For example, I use 24 kbps.
 * In order to use FEC, your bitrate should be higher. For example,
 if sample rate is 8kHz then bitrate has to be 12 kbps or 24 kbps.
@@ -39,7 +39,7 @@ opus_encoder_ctl(encoder,OPUS_SET_PACKET_LOSS_PERC(opus_packet_loss));
 ```
 
 I configure `opus_packet_loss` via config file but it may be configured in realtime.
-For example, you can update OPUS according to [RTCP](https://en.wikipedia.org/wiki/RTP_Control_Protocol)
+For example, you can update OPUS according to [RTCP](https://en.wikipedia.org/wiki/RTP_Control_Protocol){:target="_blank"}
 statistics.
 
 Now, after the encoder is ready, let's configure the decoder.

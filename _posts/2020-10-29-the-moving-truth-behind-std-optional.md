@@ -11,7 +11,7 @@ readtime: true
 
 
 The class template `std::optional` manages an optional contained value, i.e. a value that may or may not be
-present[[1]](https://en.cppreference.com/w/cpp/utility/optional). It is a great alternative for `std::unique_ptr`, or
+present[[1]](https://en.cppreference.com/w/cpp/utility/optional){:target="_blank"}. It is a great alternative for `std::unique_ptr`, or
 raw pointer, when used solely to express that a value is indeed optional. The type of the variable explicitly states that 
 a contained variable is optional and it is stored by value.
 
@@ -76,7 +76,7 @@ The following visuals illustrate the various states of `std::optional<std::strin
  
 ![std::optional layout](/img/optional.svg)
 
-[cppreference.com](https://en.cppreference.com/w/cpp/utility/optional/optional) provides a clear explanation of the behavior:
+[cppreference.com](https://en.cppreference.com/w/cpp/utility/optional/optional){:target="_blank"} provides a clear explanation of the behavior:
 > Move constructor: If other contains a value, initializes the contained value as if direct-initializing (but not
 > direct-list-initializing) an object of type T with the expression std::move(*other) and does not make other
 > empty: a moved-from optional still contains a value, but the value itself is moved from. If other does not contain a

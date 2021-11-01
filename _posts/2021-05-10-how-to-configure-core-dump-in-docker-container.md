@@ -26,14 +26,14 @@ $ echo '/tmp/core.%e.%p' | sudo tee /proc/sys/kernel/core_pattern
 * `%e` - process name
 * `%p` - PID
 
-For more details about core pattern configuration, please refer to the [man page](https://man7.org/linux/man-pages/man5/core.5.html).
+For more details about core pattern configuration, please refer to the [man page](https://man7.org/linux/man-pages/man5/core.5.html){:target="_blank"}.
 
 > Note:<br>
 > Another option is to configure the host via the container’s
 > CMD or ENTRYPOINT. Personally, I do not like this approach because the container has to run in [privileged
-> mode](https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities) which theoretically may
+> mode](https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities){:target="_blank"} which theoretically may
 > lead to a [security
-> breach](https://www.trendmicro.com/en_us/research/19/l/why-running-a-privileged-container-in-docker-is-a-bad-idea.html).
+> breach](https://www.trendmicro.com/en_us/research/19/l/why-running-a-privileged-container-in-docker-is-a-bad-idea.html){:target="_blank"}.
 
 
 The following sample application crashes immediately:
@@ -78,7 +78,7 @@ $ docker run \
         --mount type=bind,source=/tmp/,target=/tmp/ application:latest
 ```
 
-* `--init` - to ensure [proper signal](/how-signals-are-handled-in-a-docker-container) handling in the container.
+* `--init` - to ensure [proper signal](/how-signals-are-handled-in-a-docker-container){:target="_blank"} handling in the container.
 * `--ulimit core=-1` - set core dump size to unlimited for the processes running in the container.
 * `--mount type=bind,source=/tmp/,target=/tmp/` - mount host's tmp directory to the container’s tmp so that cores
 generated in the container remain available after the container is stopped or deleted.<br>

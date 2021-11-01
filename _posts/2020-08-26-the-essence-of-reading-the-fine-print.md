@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
 In my case, the code was working perfectly, until the `size` was changed somewhere deep in the configuration. After that, it started to crash due to a segmentation fault, as the code was trying to allocate too much memory on stack. The solution is to simply allocate the memory on heap. Fortunately, C++ provides plenty of options, such as `std::vector v(size)`, `std::string s(size, 0)`, `std::unique_ptr(new char[size])`, and so forth.
 
 My only question was, "How was the code successfully compiled in the first place?"<br>
-According to the C++ standard, the size of objects allocated on stack must be known at compile time. In the sample I mentioned above, `char buffer[size]` is a [variable-length array](https://en.cppreference.com/w/c/language/array), which is actually a feature from the C99 standard, and not related to C++.<br>
+According to the C++ standard, the size of objects allocated on stack must be known at compile time. In the sample I mentioned above, `char buffer[size]` is a [variable-length array](https://en.cppreference.com/w/c/language/array){:target="_blank"}, which is actually a feature from the C99 standard, and not related to C++.<br>
 The interesting catch is that while variable-length array is not supported by the C++ standard, GCC and clang still attempt to compile it because they innately comply with both standards.<br>
 I can offer the following recommendation in order to avoid such a subtle nuisance: the variable-length arrays need to be explicitly disabled by adding `-Werror=vla` to the `CXX_FLAGS`.
 

@@ -221,7 +221,7 @@ Python documentation is your best friend and has an answer for everything!
 > cause the entire reference cycle to be uncollectable,
 > including objects not necessarily in the cycle but reachable only from it. 
 > 
-> *Python docs: <https://docs.python.org/2/library/gc.html#gc.garbage>*
+> *Python docs: [https://docs.python.org/2/library/gc.html#gc.garbage](https://docs.python.org/2/library/gc.html#gc.garbage){:target="_blank"}*
 
 As you see, the `__del__` method itself was the root cause!
 
@@ -229,7 +229,7 @@ As you see, the `__del__` method itself was the root cause!
 * Don’t create aliases with `self` since it leads to a redundant
 reference(only `alias = method_name` and not `self.alias = self.method_name`)
 * Remember the Zen of Python saying: “Explicit is better than implicit.” (call `close` method explicitly or use the `with` statement)
-* Python is not C++ so do not implement [RAII](https://en.wikipedia.org/wiki/Resource_acquisition_is_initialization) there
+* Python is not C++ so do not implement [RAII](https://en.wikipedia.org/wiki/Resource_acquisition_is_initialization){:target="_blank"} there
 * Think in the Pythonic way and read the docs!:)
 
-P.S. Originally I posted it at [Medium](https://medium.com/@dimadanilov_71824/python-garbage-collector-and-other-magic-c563f9e959f9)
+P.S. Originally I posted it at [Medium](https://medium.com/@dimadanilov_71824/python-garbage-collector-and-other-magic-c563f9e959f9){:target="_blank"}

@@ -44,7 +44,7 @@ $ echo $?
 
 Rust sets the exit code to `101` explicitly when a process panics by calling the `exit` function, while `abort` signals
 the kernel to kill the process (a detailed explanation of how `abort` works on Unix systems can be found in an earlier
-        [post](/how-signals-are-handled-in-a-docker-container)). In practice, this means that no core dumps are
+        [post](/how-signals-are-handled-in-a-docker-container){:target="_blank"}). In practice, this means that no core dumps are
 generated in the default configuration.
 
 Now, let us take a look at what happens when `panic!` is called from a sub-thread:
@@ -133,4 +133,4 @@ Rust's flexibility truly does not cease to amaze and I will diligently continue 
 other enthusiasts should be aware of and use.
 
 
-*Special thanks to [Rina Volovich](https://www.linkedin.com/in/rina-volovich/) for editing.*
+*Special thanks to [Rina Volovich](https://www.linkedin.com/in/rina-volovich/){:target="_blank"} for editing.*
