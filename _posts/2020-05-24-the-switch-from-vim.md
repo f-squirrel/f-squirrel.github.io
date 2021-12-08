@@ -1,5 +1,5 @@
 ---
-title: The switch from Vim
+title: The switch from Vim to Neovim
 published: true
 permalink: "/the-switch-from-vim/"
 share-img: /img/Vimlogo.svg.png
