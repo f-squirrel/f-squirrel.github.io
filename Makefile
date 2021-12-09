@@ -3,7 +3,7 @@ IMAGE_NAME:=fsquirrel/ddanilov.me
 CONTAINER_NAME:=ddanilov.me
 
 .PHONY: help
-help: ## The Makefile helps to build Concord-BFT in a docker container
+help: ## Show this help
 	@cat $(MAKEFILE_LIST) | grep -E '^[a-zA-Z_-]+:.*?## .*$$' | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
@@ -29,8 +29,16 @@ run: ## Run Jekyll site
 		${IMAGE_NAME}:latest \
 		bundle exec jekyll serve -H 0.0.0.0
 
+.PHONY: rund
+rund: ## Run Jekyll site in background
+	docker run -it --rm --detach --name=${CONTAINER_NAME} \
+		--volume="${PWD}:/srv/jekyll" \
+		-p 4000:4000 \
+		${IMAGE_NAME}:latest \
+		bundle exec jekyll serve -H 0.0.0.0
+
 .PHONY: stop
-stop: ## Run Jekyll site
+stop: ## Stop Jekyll site
 	docker stop ${CONTAINER_NAME}
 
 .PHONY: bundle
