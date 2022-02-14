@@ -8,30 +8,28 @@ tags: [udp, opus, fec, rtcp, rtp]
 readtime: true
 ---
 
-As a reader may know UDP network protocol does not support either message retransmission or acknowledge.  It means that
-all these problems are supposed to be handled at the application level.  In audio/video transmission domain the problem
-is usually solved with [forward error correction](https://en.wikipedia.org/wiki/Forward_error_correction){:target="_blank"} technique.
-The idea is to add some redundant data to a message or messages so that if one of the messages is lost, a receiver could
-replicate it form combination other messages and the redundant data. This redundant data is called FEC.
+The UDP network protocol does not support packet retransmission or acknowledgment out of the box; applications should handle it.
+In audio/video transmission domain the problem is often solved by using [forward error correction](https://en.wikipedia.org/wiki/Forward_error_correction){:target="_blank"} technique.
+The idea is to encode messages in a redundant way so that if a message is lost or corrupted, a receiver could detect errors and often correct these errors without retransmission.
+<!--This redundant data is called FEC.-->
 
-![Packet loss image](/img/How-to-Test-Packet-Loss-on-Windows.png)
+<!--![Packet loss image](/img/How-to-Test-Packet-Loss-on-Windows.png)-->
 
-A developer is supposed to decide how much FEC to add to the messages at the encoder side and how to decode
-it at the decoder side. It sounds like a piece of work!
-So Opus codec developers decided to make our life easier and added in-band FEC support to the codec.
+In general, it is up to a developer to decide how much redundant FEC data to encode at the sender side and decode it at the receiver.
+Sometimes, it might be intricate, especially for newcomers.
+Fortunately, OPUS codec developers made our life easier by implementing in-band FEC support.
 
-In order to make OPUS encoder to add FEC a user has to set the following configuration:
+To configure in-band FEC in OPUS codec, a user has to set the following configuration:
 
-* Packet time(`ptime`) has to be not less than 10ms otherwise OPUS works in the
-[CELT](https://en.wikipedia.org/wiki/CELT){:target="_blank"} mode and not in [SILK](https://en.wikipedia.org/wiki/SILK){:target="_blank"}.
-* Don't use very high bitrates. For example, I use 24 kbps.
-* In order to use FEC, your bitrate should be higher. For example,
-if sample rate is 8kHz then bitrate has to be 12 kbps or 24 kbps.
-The encoder needs higher bitrate to have a room for LBRR packets containing FEC.
-* FEC must be enabled via `OPUS_SET_INBAND_FEC`.
-* The encoder must be told to expect packet loss via `OPUS_SET_PACKET_LOSS_PERC`.
+* Packet time (`ptime`) has to be not less than 10 ms, otherwise OPUS works in the [CELT](https://en.wikipedia.org/wiki/CELT){:target="_blank"} mode and not in [SILK](https://en.wikipedia.org/wiki/SILK){:target="_blank"}.
+* The bitrate should be *slightly* higher.
+For example, if the sample rate is 8kHz, then the bitrate should be from 12 kbps to 24 kbps.
+The encoder needs a higher bitrate to have enough room for the LBRR frames containing FEC data.
+* Do not use bitrates higher than 24 kbps, otherwise OPUS switches automatically to the CELT mode.
+* FEC must be enabled via `OPUS_SET_INBAND_FEC(TRUE)`.
+* Configure the encoder to expect packet loss percentage by setting `OPUS_SET_PACKET_LOSS_PERC(percentage)`.
 
-Here is the example of configuring OPUS encoder.
+Here is an example of configuring the OPUS encoder.
 
 ```c
 opus_encoder_ctl(encoder, OPUS_SET_INBAND_FEC(TRUE));
@@ -44,10 +42,12 @@ statistics.
 
 Now, after the encoder is ready, let's configure the decoder.
 First of all, you need to know if a packet is lost.
-The most natural way to know it is to check the sequence number of RTP packets.
-When you know that the previous packet is lost you are supposed to decode the current packet twice:
-first time with FEC turned on to reproduce the lost packet, and then with FEC turned off to decode the current packet.
+The most natural way to know it is to check the [sequence number](https://en.wikipedia.org/wiki/Real-time_Transport_Protocol#Packet_header){:target="_blank"} of RTP packets.
+If the previous packet got lost, then you should decode the current packet twice:
+1. With FEC turned on to reproduce the lost packet
+1. With FEC turned off to decode the current packet
 
+The following snippet is an example of decoder's configuration:
 ```c
 /* Decode the lost packet */
 opus_decoder_ctl(decoder, OPUS_GET_LAST_PACKET_DURATION(frame_size));
@@ -70,20 +70,24 @@ play_buffer(buffer);
 
 ## Summary ##
 
-We learned how to enable in-band FEC for Opus codec but the last thing to talk about is the pros and cons of using it!
+We learned how to configure in-band FEC for Opus codec, but the last thing to talk about is the pros and cons of using it!
 
 ### Pros: ###
 
-* No need to develop an inhouse mechanism of adding FEC to your packets.
-* Most of the third parties like SIP servers(Asterisk) or WebRTC support Opus in-band FEC out of the box.
-* FEC may increase the audio quality even when there is a packet loss.
+* No need to develop an in-house mechanism of encoding FEC data.
+* Most third parties like SIP servers (Asterisk) or WebRTC support Opus in-band FEC out of the box.
+* FEC increases the audio quality when there is packet loss or corruption.
 
 ### Cons: ###
 
 * Tricky to configure.
-* There is no obvious way to see if traffic actually carries in-band FEC except generating packet loss and listening to
-an audio sample. I used a sine wave generated by: `ffmpeg -f lavfi -i
-"sine=frequency=1000:sample_rate=8000:duration=5" output.wav`.
-* Since Opus packet contains information only about the prior packet in-band FEC can replicate only a single packet
-loss.  The problem is that usually packets are lost in a burst.
-* Enabling FEC increases bitrate and bandwidth.
+* There is no obvious way to see if traffic carries in-band FEC except generating packet loss and listening to
+an audio sample. I used a sine wave generated as follows:
+```plain
+$ ffmpeg -f lavfi \
+           -i "sine=frequency=1000:sample_rate=8000:duration=5" \
+           output.wav
+```
+* Since an OPUS packet contains information only about the previous packet, in-band FEC can replicate only a single packet loss.
+However, packets often get lost in a burst.
+* Enabling FEC implicitly increases bitrate and bandwidth.
