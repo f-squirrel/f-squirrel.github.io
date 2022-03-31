@@ -317,4 +317,14 @@ _The Github repository containing the Makefile, including a description of avail
 _The complete example used in this post, as well as examples of overriding default values and adding new commands, can be found in the repository [Dockerized C++ Build Example](https://github.com/f-squirrel/dockerized_cpp_build_example){:target="_blank"}._
 
 
+## Update
+
+I have been honored with an invitation to speak at [Core C++ User Group](https://corecppil.github.io/Meetups/) online event about this topic.
+You can check out my talk and live demo at YouTube:
+
+<div class="embed-youtube">
+<iframe width="1280" height="720" src="https://www.youtube.com/embed/B0DptqheF5I" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</div>
+
+
 *Special thanks to [Rina Volovich](https://www.linkedin.com/in/rina-volovich/) for editing.*
