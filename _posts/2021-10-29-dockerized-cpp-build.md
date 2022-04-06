@@ -11,7 +11,7 @@ share-description: The complete guide on implementing Docker-based builds for C/
 In this post, I will share how to create a docker-based build environment for C and C++ projects targeted for Linux.
 
 
-## Common problems of building project “natively” on a workstation
+## Common problems of building projects “natively” on a workstation
 
 First of all, let us discuss why building C/C++ projects directly on a workstation may become a problem. C++ does not provide a built-in dependency management mechanism and as a result, third parties are added using a mix of techniques: installing from Linux distro’s repositories (e.g. apt-get) or via “make install”, adding 3rd parties as git submodules and building them within the source tree, or using a half-baked solution like Conan. 
 <br>Unfortunately, all of them have certain disadvantages:
