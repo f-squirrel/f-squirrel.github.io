@@ -8,22 +8,22 @@ permalink: "/dockerized-cpp-build-with-vscode"
 share-description: How to configure VS Code to work with dockerized builds
 ---
 
-After I posted [Dockerized build environments for C/C++ projects](/dockerized-cpp-build) a few people asked me both online and offline about how I use IDE/text editor in this setup.
+After I posted [Dockerized build environments for C/C++ projects](/dockerized-cpp-build){:target="_blank"} a few people asked me both online and offline about how I use IDE/text editor in this setup.
 
 First of all, I would like to define the problem.
-From my point of view, there are the following problems: autocompletion, build, and debugging. Since I am a supporter of the [Unix philosophy](https://en.wikipedia.org/wiki/Unix_philosophy),
+From my point of view, there are the following problems: autocompletion, build, and debugging. Since I am a supporter of the [Unix philosophy](https://en.wikipedia.org/wiki/Unix_philosophy){:target="_blank"},
 <!-- probably need to rephrase it --> I build and debug not via an IDE/text editor but directly from the terminal. I truly believe that tools like `make` and `gdb` are more powerful than any GUI alternative. In this article, I am going to talk mostly about rich language support: autocompletion and syntax highlighting.
 It does not mean that the rest is not achievable via my approach, moreover, I am almost certain it is, but this is not the focus.
 
 There are next types of autocompletion mechanisms:
 
-* **Index/parser** based is quite simple: there is an application that parses the code and indexes it, later when autocompletion is triggered, the application looks up for a symbol in the index database. Probably, the most famous implementation is [ctags](https://en.wikipedia.org/wiki/Ctags) and its descendants. The major problem with such tools is that it is extremely hard to write a good parser for C++ which often makes the index database and cross-referencing between files in a project inaccurate.
+* **Index/parser** based is quite simple: there is an application that parses the code and indexes it, later when autocompletion is triggered, the application looks up for a symbol in the index database. Probably, the most famous implementation is [ctags](https://en.wikipedia.org/wiki/Ctags){:target="_blank"} and its descendants. The major problem with such tools is that it is extremely hard to write a good parser for C++ which often makes the index database and cross-referencing between files in a project inaccurate.
 *Index-based tools are agnostic to dockerized builds*.
 
-* [**Tree-sitter**](https://tree-sitter.github.io/tree-sitter/) is a lightweight parser that builds an abstract syntax tree ([AST]([AST](https://en.wikipedia.org/wiki/Abstract_syntax_tree))) for each source file. The tree is used to collect data about text objects in source files, it is stored in a database or a memory and used to provide information for auto-completion. Unfortunately, its autocompletion capabilities are quite limited at the moment, mostly because it has no information about the build system and parses every file individually. However, it is widely used as a data provider for extended syntax highlighting.
+* [**Tree-sitter**](https://tree-sitter.github.io/tree-sitter/){:target="_blank"} is a lightweight parser that builds an abstract syntax tree ([AST](https://en.wikipedia.org/wiki/Abstract_syntax_tree){:target="_blank"}) for each source file. The tree is used to collect data about text objects in source files, it is stored in a database or a memory and used to provide information for auto-completion. Unfortunately, its autocompletion capabilities are quite limited at the moment, mostly because it has no information about the build system and parses every file individually. However, it is widely used as a data provider for extended syntax highlighting.
 *This mechanism is also insensitive to dockerized builds*.
 
-* **Compiler-based** is more complicated: it utilizes the compiler's original parser to build an abstract syntax tree ([AST](https://en.wikipedia.org/wiki/Abstract_syntax_tree)), which is used for indexing.
+* **Compiler-based** is more complicated: it utilizes the compiler's original parser to build an abstract syntax tree ([AST](https://en.wikipedia.org/wiki/Abstract_syntax_tree){:target="_blank"}), which is used for indexing.
 As a result, the autocompletion metadata is collected by the best language parser in the world, the compiler.
 Usually, this kind of tool provides the most accurate information about the source for auto-completion.
 *Almost always are affected by the dockerized builds*.
@@ -35,13 +35,13 @@ Since the accuracy of autocompletion is extremely important for me, I always try
 
 ## Clangd
 
-The first and meanwhile the only compiler-based autocompletion parser for C++ is [clangd](https://clangd.llvm.org/); it is based on the [Clang](https://clang.llvm.org/) C++ compiler and part of the [LLVM](https://llvm.org/) project. Once the `clangd` server is launched, it looks for a file `compile_commands.json`. It contains a list of files in the project together with the compiler flags. To instruct CMake to generate this file, add the following to the top-level `CMakeLists.txt` file:
+The first and meanwhile the only compiler-based autocompletion parser for C++ is [clangd](https://clangd.llvm.org/){:target="_blank"}; it is based on the [Clang](https://clang.llvm.org/){:target="_blank"} C++ compiler and part of the [LLVM](https://llvm.org/){:target="_blank"} project. Once the `clangd` server is launched, it looks for a file `compile_commands.json`. It contains a list of files in the project together with the compiler flags. To instruct CMake to generate this file, add the following to the top-level `CMakeLists.txt` file:
 
 ```cmake
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 ```
 
-*For information about other build systems and customized configurations, please refer to the official [documentation](https://clangd.llvm.org/installation#project-setup).*
+*For information about other build systems and customized configurations, please refer to the official [documentation](https://clangd.llvm.org/installation#project-setup){:target="_blank"}.*
 
 Usually, I add a symlink to this file from the top-level folder in the source tree:
 
@@ -52,7 +52,7 @@ ls -l compile_commands.json
 lrwxrwxrwx 1 dima dima 36 Aug  2 17:13 compile_commands.json -> ./build/compile_commands.json
 ```
 
- For the example [project](https://github.com/f-squirrel/dockerized_cpp_build_example) I have created for the post about [Dockerized build environments for C/C++ projects](/dockerized-cpp-build), the generated `compile_commands.json` looks like the following:
+ For the example [project](https://github.com/f-squirrel/dockerized_cpp_build_example){:target="_blank"} I have created for the post about [Dockerized build environments for C/C++ projects](/dockerized-cpp-build){:target="_blank"}, the generated `compile_commands.json` looks like the following:
 
 ```json
 [
@@ -84,13 +84,13 @@ Fortunately, clangd watches the files and updates the index in the background.
 
 ## VS Code with Clangd
 
-The first time, I used it, was via an amazing Vim plugin [YouCompleteMe](https://github.com/ycm-core/YouCompleteMe), later I switched to [Neovim](/the-switch-from-vim/) and started using `clangd` as an [LSP](https://microsoft.github.io/language-server-protocol/) server. A few months ago, I have switched to a new setup VS Code with [VSCode Neovim](https://github.com/vscode-neovim/vscode-neovim) plugin. Yes, I admit the addiction to Vim motions.
+The first time, I used it, was via an amazing Vim plugin [YouCompleteMe](https://github.com/ycm-core/YouCompleteMe){:target="_blank"}, later I switched to [Neovim](/the-switch-from-vim/){:target="_blank"} and started using `clangd` as an [LSP](https://microsoft.github.io/language-server-protocol/){:target="_blank"} server. A few months ago, I have switched to a new setup VS Code with [VSCode Neovim](https://github.com/vscode-neovim/vscode-neovim){:target="_blank"} plugin. Yes, I admit the addiction to Vim motions.
 
-So, to enable `clangd` in VS Code, first of all, need to install the official LLVM [extension](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd). After it is installed it will propose to install the latest `clangd` server, if you don't have it already installed, I suggest agreeing. While for natively build projects, it is enough, the dockerized builds require an extra step.
+So, to enable `clangd` in VS Code, first of all, need to install the official LLVM [extension](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd){:target="_blank"}. After it is installed it will propose to install the latest `clangd` server, if you don't have it already installed, I suggest agreeing. While for natively build projects, it is enough, the dockerized builds require an extra step.
 
 ## VS Code with Docker Support
 
-VS Code provides Docker support via [Remote - Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension. It lets using a Docker container as a full-featured development environment and allows opening any folder inside (or mounted into) a container and taking advantage of Visual Studio Code's full feature set.
+VS Code provides Docker support via [Remote - Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers){:target="_blank"} extension. It lets using a Docker container as a full-featured development environment and allows opening any folder inside (or mounted into) a container and taking advantage of Visual Studio Code's full feature set.
 
 A file `.devcontainer.json` in the top-level directory of the project tells VS Code to re-load it in a Docker container. For our example project, it will be like the following:
 
@@ -163,6 +163,6 @@ Some users might find the [CodeLLDB](https://marketplace.visualstudio.com/items?
 
 ## Additional information
 
-For the full information about the configurations available via the `.devcontainer.json` file, please refer to the official [page](https://code.visualstudio.com/docs/remote/containers#_create-a-devcontainerjson-file).
+For the full information about the configurations available via the `.devcontainer.json` file, please refer to the official [page](https://code.visualstudio.com/docs/remote/containers#_create-a-devcontainerjson-file){:target="_blank"}.
 
-As usual, the example [project](https://github.com/f-squirrel/dockerized_cpp_build_example) at Github is updated with the docker configuration described in this post.
+As usual, the example [project](https://github.com/f-squirrel/dockerized_cpp_build_example){:target="_blank"} at Github is updated with the docker configuration described in this post.
