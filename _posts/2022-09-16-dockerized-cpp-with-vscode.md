@@ -15,7 +15,11 @@ From my point of view, there are the following problems: autocompletion, build, 
 <!-- probably need to rephrase it --> I build and debug not via an IDE/text editor but directly from the terminal. I truly believe that tools like `make` and `gdb` are more powerful than any GUI alternative. In this article, I am going to talk mostly about rich language support: autocompletion and syntax highlighting.
 It does not mean that the rest is not achievable via my approach, moreover, I am almost certain it is, but this is not the focus.
 
-There are next types of autocompletion mechanisms:
+## Auto-completion types
+
+Auto-completion is probably one of the most important things that a modern IDE or text may provide. There are several types of autocompletion mechanisms: some of them more accurate but robust, whlie some of them are more precise but require more fine-tuning.
+
+<!-- There are next types of autocompletion mechanisms: -->
 
 * **Index/parser** based is quite simple: there is an application that parses the code and indexes it, later when autocompletion is triggered, the application looks up for a symbol in the index database. Probably, the most famous implementation is [ctags](https://en.wikipedia.org/wiki/Ctags){:target="_blank"} and its descendants. The major problem with such tools is that it is extremely hard to write a good parser for C++ which often makes the index database and cross-referencing between files in a project inaccurate.
 *Index-based tools are agnostic to dockerized builds*.
@@ -31,7 +35,7 @@ Also, it is often the heaviest option.
 
 * **Hybrid** is a mixture of the above.
 
-Since the accuracy of autocompletion is extremely important for me, I always try to use compiler-based tools.
+Since the accuracy of autocompletion is extremely important for me, I always prefer using compiler-based tools.
 
 ## Clangd
 
@@ -86,7 +90,7 @@ Fortunately, clangd watches the files and updates the index in the background.
 
 The first time, I used it, was via an amazing Vim plugin [YouCompleteMe](https://github.com/ycm-core/YouCompleteMe){:target="_blank"}, later I switched to [Neovim](/the-switch-from-vim/){:target="_blank"} and started using `clangd` as an [LSP](https://microsoft.github.io/language-server-protocol/){:target="_blank"} server. A few months ago, I have switched to a new setup VS Code with [VSCode Neovim](https://github.com/vscode-neovim/vscode-neovim){:target="_blank"} plugin. Yes, I admit the addiction to Vim motions.
 
-So, to enable `clangd` in VS Code, first of all, need to install the official LLVM [extension](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd){:target="_blank"}. After it is installed it will propose to install the latest `clangd` server, if you don't have it already installed, I suggest agreeing. While for natively build projects, it is enough, the dockerized builds require an extra step.
+So, to enable `clangd` in VS Code, first of all, need to install the official LLVM [extension](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd){:target="_blank"}. After it is installed it will propose to install the latest `clangd` server, if you don't have it already installed, I suggest agreeing. While for natively built projects it is enough, the dockerized builds require an extra step.
 
 ## VS Code with Docker Support
 
@@ -125,23 +129,23 @@ where:
 
 After the Docker extension is installed and the `.devcontainer.json` file is placed in the repository, VS Code proposes to re-open the project in the container:
 
-![Open in container](/img/vscode_reopen_in_container_prompt.png)
+[![Open in container](/img/vscode_reopen_in_container_prompt.png)](/img/vscode_reopen_in_container_prompt.png)
   
 Once a user agrees, VS Code launches a Docker container based on the `"image"` and adds there the extensions specified in `"extensions"`. Since the base image does not contain `clangd`, VS Code will ask to install it, I recommend agreeing, the same as for the native builds.
 
-![Install Clangd](/img/vscode_asks_to_install_clangd.png)
+[![Install Clangd](/img/vscode_asks_to_install_clangd.png)](/img/vscode_asks_to_install_clangd.png)
 
 Once installed and reloaded, VS Code launches the `clangd` server, we can see it because the source tree contains the `.cache` directory with the index database and the auto-completion works like a charm.
 
-![Auto-completion with the cache folder](/img/vscode_with_clangd_in_docker_autocompletion.png)
+[![Auto-completion with the cache folder](/img/vscode_with_clangd_in_docker_autocompletion.png)](/img/vscode_with_clangd_in_docker_autocompletion.png)
 
 Additionally, `clangd` provides error and warning messages based on compiler diagnostics and clang-tidy configuration (if exists):
 
-![Compiler diagnostics](/img/vscode_diagnostics_1.png)
+[![Compiler diagnostics](/img/vscode_diagnostics_1.png)](/img/vscode_diagnostics_1.png)
 
 And fix suggestions for the cases when the compiler can help:
 
-![Fix suggestion](/img/vscode_code_suggetions.png)
+[![Fix suggestion](/img/vscode_code_suggetions.png)](/img/vscode_code_suggetions.png)
 
 The last but important feature is the support of format based on the `.clang-format` file.
 
@@ -151,11 +155,11 @@ After the important things are set up, the reader may add other useful extension
 
 For example, CMake files are not highlighted properly and to improve it, need to install the CMake plugin in the container, as shown in the picture below:
 
-![Install CMake in Container](/img/vscode_without_cmake_in_docker.png)
+[![Install CMake in Container](/img/vscode_without_cmake_in_docker.png)](/img/vscode_without_cmake_in_docker.png)
 
 After the plugin is installed, I suggest adding it to the `.devcontainer.json` file either manually or via the UI so that the next time the container is launched, the extension will be installed automatically:
 
-![Add to devcontainer](/img/vscode_add_todevcontainer.png)
+[![Add to devcontainer](/img/vscode_add_todevcontainer.png)](/img/vscode_add_todevcontainer.png)
 
 Besides those plugins, my setup usually includes various plugins depending on the project: Python plugin(s), Grammarly (checks grammar in text and markdown files), Git Lens, markdown linter, and others.
 
