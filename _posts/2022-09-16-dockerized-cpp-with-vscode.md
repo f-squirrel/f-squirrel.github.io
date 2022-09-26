@@ -10,14 +10,17 @@ share-description: How to configure VS Code to work with dockerized builds
 
 After I posted [Dockerized build environments for C/C++ projects](/dockerized-cpp-build){:target="_blank"} a few people asked me both online and offline about how I use IDE/text editor in this setup.
 
-First of all, I would like to define the problem.
-From my point of view, there are the following problems: autocompletion, build, and debugging. Since I am a supporter of the [Unix philosophy](https://en.wikipedia.org/wiki/Unix_philosophy){:target="_blank"},
-<!-- probably need to rephrase it --> I build and debug not via an IDE/text editor but directly from the terminal. I truly believe that tools like `make` and `gdb` are more powerful than any GUI alternative. In this article, I am going to talk mostly about rich language support: autocompletion and syntax highlighting.
-It does not mean that the rest is not achievable via my approach, moreover, I am almost certain it is, but this is not the focus.
+While IDEs and text editors provide different features, the most important, from my point of view, are *syntax highlighting, auto-completion, and code navigation*.
+Since all three are usually provided by a single piece of software, I will call it just auto-completion.
+Things like building and debugging I prefer to do directly from the terminal, so I will cover them at the end of the post.
+
+<!-- From my point of view, there are the following problems: autocompletion, build, and debugging.
+Since I am a supporter of the [Unix philosophy](https://en.wikipedia.org/wiki/Unix_philosophy){:target="_blank"},
+I build and debug not via an IDE/text editor but directly from the terminal. I truly believe that tools like `make` and `gdb` are more powerful than any GUI alternative. In this article, I am going to talk mostly about rich language support: autocompletion and syntax highlighting. -->
 
 ## Auto-completion types
 
-Auto-completion is probably one of the most important things that a modern IDE or text may provide. There are several types of autocompletion mechanisms: some of them more accurate but robust, whlie some of them are more precise but require more fine-tuning.
+Auto-completion is probably one of the most important things that a modern IDE or text may provide. There are several types of autocompletion mechanisms: some of them are more accurate but robust, while some of them are more precise but require more fine-tuning.
 
 <!-- There are next types of autocompletion mechanisms: -->
 
@@ -153,7 +156,7 @@ The last but important feature is the support of format based on the `.clang-for
 
 After the important things are set up, the reader may add other useful extensions to the `.devcontainer.json`. It might be important because once launched in Docker, all the interaction with source code is done from within a container, i.e., if the reader uses any plugins for editing file types other than C++ within their project, it is recommended to add the corresponding plugins to the `.devcontainer.json` file.
 
-For example, CMake files are not highlighted properly and to improve it, need to install the CMake plugin in the container, as shown in the picture below:
+For example, CMake files are not highlighted properly, and to improve it, need to install the CMake plugin in the container, as shown in the picture below:
 
 [![Install CMake in Container](/img/vscode_without_cmake_in_docker.png)](/img/vscode_without_cmake_in_docker.png)
 
