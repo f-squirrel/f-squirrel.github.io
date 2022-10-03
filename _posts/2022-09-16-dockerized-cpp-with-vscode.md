@@ -14,10 +14,6 @@ While IDEs and text editors provide different features, the most important, from
 Since all three are usually provided by a single piece of software, I will call it just auto-completion.
 Things like building and debugging I prefer to do directly from the terminal, so I will cover them at the end of the post.
 
-<!-- From my point of view, there are the following problems: autocompletion, build, and debugging.
-Since I am a supporter of the [Unix philosophy](https://en.wikipedia.org/wiki/Unix_philosophy){:target="_blank"},
-I build and debug not via an IDE/text editor but directly from the terminal. I truly believe that tools like `make` and `gdb` are more powerful than any GUI alternative. In this article, I am going to talk mostly about rich language support: autocompletion and syntax highlighting. -->
-
 ## Auto-completion types
 
 Auto-completion is probably one of the most important things that a modern IDE or text may provide. There are several types of autocompletion mechanisms: some of them are more accurate but robust, while some of them are more precise but require more fine-tuning.
@@ -41,6 +37,8 @@ Also, it is often the heaviest option.
 Since the accuracy of autocompletion is extremely important for me, I always prefer using compiler-based tools.
 
 ## Clangd
+
+<!-- It is neither first nor only, need to mention `libclang`? -->
 
 The first and meanwhile the only compiler-based autocompletion parser for C++ is [clangd](https://clangd.llvm.org/){:target="_blank"}; it is based on the [Clang](https://clang.llvm.org/){:target="_blank"} C++ compiler and part of the [LLVM](https://llvm.org/){:target="_blank"} project. Once the `clangd` server is launched, it looks for a file `compile_commands.json`. It contains a list of files in the project together with the compiler flags. To instruct CMake to generate this file, add the following to the top-level `CMakeLists.txt` file:
 
