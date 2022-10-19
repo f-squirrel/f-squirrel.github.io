@@ -20,7 +20,7 @@ Auto-completion is probably one of the most important things that a modern IDE o
 
 <!-- There are next types of autocompletion mechanisms: -->
 
-* **Index/parser** based is quite simple: there is an application that parses the code and indexes it, later when autocompletion is triggered, the application looks up for a symbol in the index database. Probably, the most famous implementation is [ctags](https://en.wikipedia.org/wiki/Ctags){:target="_blank"} and its descendants. The major problem with such tools is that it is extremely hard to write a good parser for C++ which often makes the index database and cross-referencing between files in a project inaccurate.
+* **Index/parser** based is quite simple: there is an application that parses the code and indexes it, later when autocompletion is triggered, the application looks up a symbol in the index database. Probably, the most famous implementation is [ctags](https://en.wikipedia.org/wiki/Ctags){:target="_blank"} and its descendants. The major problem with such tools is that it is extremely hard to write a good parser for C++ which often makes the index database and cross-referencing between files in a project inaccurate.
 *Index-based tools are agnostic to dockerized builds*.
 
 * [**Tree-sitter**](https://tree-sitter.github.io/tree-sitter/){:target="_blank"} is a lightweight parser that builds an abstract syntax tree ([AST](https://en.wikipedia.org/wiki/Abstract_syntax_tree){:target="_blank"}) for each source file. The tree is used to collect data about text objects in source files, it is stored in a database or a memory and used to provide information for auto-completion. Unfortunately, its autocompletion capabilities are quite limited at the moment, mostly because it has no information about the build system and parses every file individually. However, it is widely used as a data provider for extended syntax highlighting.
@@ -29,12 +29,12 @@ Auto-completion is probably one of the most important things that a modern IDE o
 * **Compiler-based** is more complicated: it utilizes the compiler's original parser to build an abstract syntax tree ([AST](https://en.wikipedia.org/wiki/Abstract_syntax_tree){:target="_blank"}), which is used for indexing.
 As a result, the autocompletion metadata is collected by the best language parser in the world, the compiler.
 Usually, this kind of tool provides the most accurate information about the source for auto-completion.
-*Almost always are affected by the dockerized builds*.
+*Almost always affected by the dockerized builds*.
 Also, it is often the heaviest option.
 
 * **Hybrid** is a mixture of the above.
 
-Since the accuracy of autocompletion is extremely important for me, I always prefer using compiler-based tools.
+Since the accuracy of autocompletion is extremely important to me, I always prefer using compiler-based tools.
 
 ## Clangd
 
@@ -72,7 +72,7 @@ lrwxrwxrwx 1 dima dima 36 Aug  2 17:13 compile_commands.json -> ./build/compile_
 The JSON contains three entries per each file:
 
 * Path to the directory where `compile_commands.json` files are located
-* Compile command, including defines, include paths, C++ standard used, flags, etc
+* Compile commands, including defines, include paths, C++ standard used, flags, etc
 * Path to the C++ file
 
 Note that all the paths are *absolute*, which means that `clangd` has to run on the identical filesystem as the build system. This becomes a problem when building in docker: the `clangd` server runs on the host while the absolute path to source files and includes are from the docker container's filesystem. Don't worry, we will handle it later in this post.
@@ -95,7 +95,7 @@ So, to enable `clangd` in VS Code, first of all, need to install the official LL
 
 ## VS Code with Docker Support
 
-VS Code provides Docker support via [Remote - Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers){:target="_blank"} extension. It lets using a Docker container as a full-featured development environment and allows opening any folder inside (or mounted into) a container and taking advantage of Visual Studio Code's full feature set.
+VS Code provides Docker support via [Remote - Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers){:target="_blank"} extension. It lets use a Docker container as a full-featured development environment and allows opening any folder inside (or mounted into) a container and taking advantage of Visual Studio Code's full feature set.
 
 A file `.devcontainer.json` in the top-level directory of the project tells VS Code to re-load it in a Docker container. For our example project, it will be like the following:
 
