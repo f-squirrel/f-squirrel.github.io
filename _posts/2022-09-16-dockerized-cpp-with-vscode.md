@@ -2,7 +2,7 @@
 title: VS Code with dockerized build environments for C/C++ projects
 published: true
 tags: [c, cpp, docker, make, build, vscode]
-share-img: /img/docker-logo-696x364.png
+share-img: /img/docker_vscode.png
 readtime: true
 permalink: "/dockerized-cpp-build-with-vscode"
 share-description: How to configure VS Code to work with dockerized builds
