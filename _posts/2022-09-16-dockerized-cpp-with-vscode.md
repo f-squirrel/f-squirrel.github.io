@@ -79,13 +79,13 @@ Fortunately, clangd watches the files and updates the index in the background.
 
 ## VS Code with Clangd
 
-The first time, I used it, was via an amazing Vim plugin [YouCompleteMe](https://github.com/ycm-core/YouCompleteMe){:target="_blank"}, later I switched to [Neovim](/the-switch-from-vim/){:target="_blank"} and started using `clangd` as an [LSP](https://microsoft.github.io/language-server-protocol/){:target="_blank"} server. A few months ago, I switched to a new setup VS Code with [VSCode Neovim](https://github.com/vscode-neovim/vscode-neovim){:target="_blank"} plugin. Yes, I admit the addiction to Vim motions.
+The first time I used it was via an amazing Vim plugin [YouCompleteMe](https://github.com/ycm-core/YouCompleteMe){:target="_blank"}, later I switched to [Neovim](/the-switch-from-vim/){:target="_blank"} and started using `clangd` as an [LSP](https://microsoft.github.io/language-server-protocol/){:target="_blank"} server. A few months ago, I switched to a new setup VS Code with [VSCode Neovim](https://github.com/vscode-neovim/vscode-neovim){:target="_blank"} plugin. Yes, I admit the addiction to Vim motions.
 
 So, to enable `clangd` in VS Code, first of all, need to install the official LLVM [extension](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd){:target="_blank"}. After it is installed, it will propose to install the latest `clangd` server; if you don't have it already installed, I suggest agreeing. While for natively built projects, it is enough, the dockerized builds require an extra step.
 
 ## VS Code with Docker Support
 
-VS Code provides Docker support via [Remote - Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers){:target="_blank"} extension. It lets use a Docker container as a full-featured development environment. It allows opening any folder inside (or mounted into) a container and taking advantage of Visual Studio Code's full feature set.
+VS Code provides Docker support via [Remote - Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers){:target="_blank"} extension. It lets use a Docker container as a full-featured development environment. It allows opening any folder inside (or mounted into) a container and taking advantage of Visual Studio Code's complete feature set.
 A file `.devcontainer.json` in the project's top-level directory tells VS Code to re-load it in a Docker container. For our example project, it will be like the following:
 
 ```json
@@ -113,9 +113,9 @@ where:
 
 * `"image"` - the image we use for building the project
 * `"runArgs"` - represents the flags provided to `docker run` for launching the container for auto-completion. In this example, I added the basic flags required for debugging in Docker.
-* `"extensions"` - a list of VS Code extensions to be installed in the container. I have added only `clangd` at the moment, but more will be added soon.
+* `"extensions"` - a list of VS Code extensions to be installed in the container. I have added only `clangd`, but more will be added soon.
 * `"workspaceMount"` - mounting point; in our case, we mount the current directory to the directory `example` in the container. The very same way we did in the build container.
-* `"onCreateCommand"` is a bit ugly: the build container comes without Git, so I had to install it every time the auto-completion container is created. I believe there is a cleaner way to do it, but it worked fine for me.
+* `"onCreateCommand"` is a bit ugly: the build container comes without Git, so I had to install it every time the auto-completion container is created. I believe there is a cleaner way to do it, but it worked fine.
 
 After the Docker extension is installed and the `.devcontainer.json` file is placed in the repository, VS Code proposes to re-open the project in the container:
 
@@ -153,7 +153,7 @@ After the plugin is installed, I suggest adding it to the `.devcontainer.json` f
 
 Besides those plugins, my setup usually includes various plugins depending on the project: Python plugin(s), [Grammarly](https://marketplace.visualstudio.com/items?itemName=znck.grammarly) (checks grammar in text and markdown files), Git Lens, markdown linter, and others.
 
-Some users might find the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) extension useful. It provides a native debugger powered by LLDB, to debug C++, Rust, and other compiled languages.
+Some users might find the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) extension useful. It provides a native debugger powered by LLDB to debug C++, Rust, and other compiled languages.
 
 ## Additional information
 
