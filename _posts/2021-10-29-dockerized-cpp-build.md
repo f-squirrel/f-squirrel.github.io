@@ -327,4 +327,8 @@ You can check out my talk and live demo at YouTube:
 </div>
 
 
+## Update #2
+
+You can read about configuring VS Code to work with Dockerized C/C++ build in my latest [post](/dockerized-cpp-build-with-vscode).
+
 *Special thanks to [Rina Volovich](https://www.linkedin.com/in/rina-volovich/) for editing.*
