@@ -151,7 +151,7 @@ After the plugin is installed, I suggest adding it to the `.devcontainer.json` f
 
 [![Add to devcontainer](/img/vscode_add_todevcontainer.png)](/img/vscode_add_todevcontainer.png)
 
-Besides those plugins, my setup usually includes various plugins depending on the project: Python plugin(s), Grammarly (checks grammar in text and markdown files), Git Lens, markdown linter, and others.
+Besides those plugins, my setup usually includes various plugins depending on the project: Python plugin(s), [Grammarly](https://marketplace.visualstudio.com/items?itemName=znck.grammarly) (checks grammar in text and markdown files), Git Lens, markdown linter, and others.
 
 Some users might find the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) extension useful. It provides a native debugger powered by LLDB, to debug C++, Rust, and other compiled languages.
 
