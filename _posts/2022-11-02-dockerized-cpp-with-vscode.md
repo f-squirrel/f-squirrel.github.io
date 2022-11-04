@@ -119,23 +119,29 @@ where:
 
 After the Docker extension is installed and the `.devcontainer.json` file is placed in the repository, VS Code proposes to re-open the project in the container:
 
-[![Open in container](/img/vscode_reopen_in_container_prompt.png)](/img/vscode_reopen_in_container_prompt.png)
+[![Open in container](/img/snap-0.png)](/img/snap-0.png)
+<!-- [![Open in container](/img/vscode_reopen_in_container_prompt.png)](/img/vscode_reopen_in_container_prompt.png) -->
   
 Once the user agrees, VS Code launches a Docker container based on the `"image"` and adds the extensions specified in `"extensions"`. Since the base image does not contain `clangd`, VS Code will ask to install it; it is strongly recommended to proceed.
 
-[![Install Clangd](/img/vscode_asks_to_install_clangd.png)](/img/vscode_asks_to_install_clangd.png)
+<!-- [![Install Clangd](/img/vscode_asks_to_install_clangd.png)](/img/vscode_asks_to_install_clangd.png) -->
+[![Install Clangd](/img/snap-1.png)](/img/snap-1.png)
 
 Once installed and reloaded, VS Code launches the `clangd` server, which can be confirmed by checking the source tree for the `.cache` directory with the index database, and the auto-completion works like a charm.
 
-[![Auto-completion with the cache folder](/img/vscode_with_clangd_in_docker_autocompletion.png)](/img/vscode_with_clangd_in_docker_autocompletion.png)
+<!-- [![Auto-completion with the cache folder](/img/vscode_with_clangd_in_docker_autocompletion.png)](/img/vscode_with_clangd_in_docker_autocompletion.png) -->
+
+[![Auto-completion with the cache folder](/img/snap-2.png)](/img/snap-2.png)
 
 Additionally, `clangd` provides error and warning messages based on compiler diagnostics and clang-tidy configuration (if it exists):
 
-[![Compiler diagnostics](/img/vscode_diagnostics_1.png)](/img/vscode_diagnostics_1.png)
+[![Compiler diagnostics](/img/snap-3.png)](/img/snap-3.png)
+
+<!-- [![Compiler diagnostics](/img/vscode_diagnostics_1.png)](/img/vscode_diagnostics_1.png) -->
 
 It also provides fix suggestions for cases when the compiler can help:
 
-[![Fix suggestion](/img/vscode_code_suggetions.png)](/img/vscode_code_suggetions.png)
+[![Fix suggestion](/img/snap-4.png)](/img/snap-4.png)
 
 The last noteworthy feature is the support of format based on the `.clang-format` file.
 
@@ -145,11 +151,11 @@ After critical setup is completed, other valuable extensions can be added to the
 
 For example, CMake files are not highlighted properly; this is remedied by installing the CMake plugin in the container, as shown in the picture below:
 
-[![Install CMake in Container](/img/vscode_without_cmake_in_docker.png)](/img/vscode_without_cmake_in_docker.png)
+[![Install CMake in Container](/img/snap-5-1.png)](/img/snap-5-1.png)
 
 After the plugin is installed, I suggest adding it to the `.devcontainer.json` file either manually or via the UI so that the next time the container is launched, the extension will be installed automatically:
 
-[![Add to devcontainer](/img/vscode_add_todevcontainer.png)](/img/vscode_add_todevcontainer.png)
+[![Add to devcontainer](/img/snap-7.png)](/img/snap-7.png)
 
 Besides those mentioned, my setup usually includes various plugins, depending on the project: Python plugin(s), [Grammarly](https://marketplace.visualstudio.com/items?itemName=znck.grammarly) (checks grammar in text and markdown files), Git Lens, markdown linter, and others.
 
