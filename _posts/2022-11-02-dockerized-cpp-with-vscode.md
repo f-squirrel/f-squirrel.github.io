@@ -157,9 +157,9 @@ After the plugin is installed, I suggest adding it to the `.devcontainer.json` f
 
 [![Add to devcontainer](/img/snap-7.png)](/img/snap-7.png)
 
-Besides those mentioned, my setup usually includes various plugins, depending on the project: Python plugin(s), [Grammarly](https://marketplace.visualstudio.com/items?itemName=znck.grammarly) (checks grammar in text and markdown files), Git Lens, markdown linter, and others.
+Besides those mentioned, my setup usually includes various plugins, depending on the project: Python plugin(s), [Grammarly](https://marketplace.visualstudio.com/items?itemName=znck.grammarly){:target="_blank"} (checks grammar in text and markdown files), Git Lens, markdown linter, and others.
 
-Some users might find the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) extension useful, which provides a native debugger powered by LLDB to debug C++, Rust, and other compiled languages.
+Some users might find the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb){:target="_blank"} extension useful, which provides a native debugger powered by LLDB to debug C++, Rust, and other compiled languages.
 
 ## Additional information
 
