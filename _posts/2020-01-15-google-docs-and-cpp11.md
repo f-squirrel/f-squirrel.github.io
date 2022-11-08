@@ -8,9 +8,9 @@ readtime: true
 ---
 
 
-While writing about smart pointers in C++ I’ve noticed a funny thing: Google Docs know about C++ syntax but not about C++ 11-17!
+While writing about smart pointers in C++, I noticed a funny thing: Google Docs knows about C++ syntax but not C++ 11!
 It showed the following suggestion:
 
 ![Google Docs does not recognize CPP 11](/img/google_docs_cpp11_auto_ptr.png)
 
-I hope Google Docs’ team will adjust the spell checker to the latest C++ standards:)
+I hope the Google Docs team will adjust the spell checker to the latest C++ standards:)
