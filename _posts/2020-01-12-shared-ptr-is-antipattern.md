@@ -4,42 +4,32 @@ subtitle: In most of the cases
 published: true
 permalink: "/shared-ptr-is-evil/"
 share-description: "Nuances of the implementation of std::shared_ptr, its drawbacks, and best practices"
-tags: [cpp, shared_ptr]
+tags: [cpp, shared_ptr, weak_ptr, pointer]
 readtime: true
 ---
 
 ## A bit of history ##
-The first time a shared pointer was introduced in boost library in the year of 1999.
-Even before [boost had release numbers](https://www.boost.org/users/history/old_versions.html){:target="_blank"}!
-Back then the only alternative standard C++ could provide with was `std::auto_ptr`.
- It was so bad that it was rarely used, [got deprecated in C++ 11](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3242.pdf){:target="_blank"} and [was eventually removed in C++ 17](https://en.cppreference.com/w/cpp/memory/auto_ptr){:target="_blank"}.
-So the only way to have a nice smart pointer in C++ 98/03 was to use `boost::shared_ptr`.
-In C++ 11 `boost::shared_ptr` finally made it to the standard library.
 
+A shared pointer was introduced in 1999 as part of the Boost Library Collection. It existed even before Boost had [version](https://www.boost.org/users/history/old_versions.html){:target="_blank"} numbers. The only alternative the standard C++ library could provide was `auto_ptr.` Auto pointer became famous mainly for its disadvantages, and as a result, it was rarely used. Finally, the auto pointer was deprecated in C++ 11 and completely removed in C++ 17. In C++ 11, `boost::shared_ptr` finally made it to the standard library together with other smart pointers. For over a decade, Boost's shared pointer was the most used smart pointer in C++.
 
 ## A few words about how `shared_ptr` works ##
-If the reader knows how `std::shared_ptr` works they may skip this section.
-From a very simplified point of view, a shared pointer has two pointers: one to an object in the heap that it owns and
-another to a reference counter of shared instances.
-* Every time a shared pointer’s copy-constructor is called the counter is incremented
-* Every time a shared pointer’s assignment operator is called the counter of the right-hand pointer is incremented and
-of the left-hand is decremented
-* Every time a shared pointer’s destructor is called the counter is decremented
-* If the counter equals zero the object is deleted
 
+<!-- If the reader knows how `std::shared_ptr` works they may skip this section. -->
+From a very simplified point of view, a shared pointer has two pointers: one to an object at the heap and another to a reference counter of shared instances.
+
+* Every time a shared pointer’s copy-constructor is called, the shared pointer increments the counter
+* Every time a shared pointer’s assignment operator is called, the right-hand pointer increments its counter, and the left-hand pointer decrements
+* Every time a shared pointer’s destructor is called, it decrements its counter
+* If the counter equals zero, the object is deleted
 
 ## The ideal usage ##
-With the shared pointer a programmer may create a variable and pass it wherever they want without caring about memory
-deallocation because at some point it happens automatically. It is awesome, isn’t it? Let us see!
 
+With the shared pointer, a programmer can create a variable at the heap and pass it wherever they want without caring about memory deallocation because, at some point, it happens automatically. It is fantastic, isn’t it? Let us see!
 
-## Incrementation of the reference counter and multi-threading ##
-In order to satisfy thread-safety requirements, the reference counter is usually implemented as atomic. So every time a
-shared pointer is passed by value its atomic counter is incremented and decremented.
-Obviously, an incrementation of the atomic counter is [relatively
-expensive](https://stackoverflow.com/questions/32591204/how-expensive-are-atomic-operations){:target="_blank"}.
+## Reference counter and multi-threading ##
 
-This issue may be addressed by *passing shared pointers by const reference*. Thus, you do not increment/decrement the counter and save CPU cycles. Let’s see the difference in performance by running the following code:
+Shared pointers are often used in multi-threaded programs, where several pointers may update the same reference counter from different threads. The counter is implemented as an atomic, if hardware allows, or with a mutex to prevent data races. The update of atomic variables is more [expensive](https://stackoverflow.com/questions/32591204/how-expensive-are-atomic-operations){:target="_blank"} than regular primitives. In order to see the influence of atomic counter updates on performance, I have prepared a code snippet that passes a shared pointer by *value* and by *reference* one million times.
+
 ```cpp
 #include <memory>
 
@@ -83,15 +73,17 @@ int main(int argc, char *argv[]) {
 }
 ```
 
-And the output is:
-<pre>
+The difference is quite significant:
+
+```plain
 $ ./cpu_atomic_copy.bin 1 999999
 It took me 3616 microseconds.
 $ ./cpu_atomic_copy.bin 2 999999
 It took me 2 microseconds.
-</pre>
+```
 
-The difference is breathtaking!!!<br> But wait, if I do not update the reference counter my shared pointer does not
+If shared pointers are often passed to functions, **it is preferred to give them by references unless a function executes in a separate thread.**
+<!-- <br> But wait, if I do not update the reference counter my shared pointer does not
 track the reference count!  Shared pointer’s counter can be changed outside of the current function scope only if there
 is a reference to the pointer in another thread.  Thus, **the only reason to pass a shared pointer by value is when
 passing it to another thread**.  So when the first thread stops and all its objects are destructed or the thread just
@@ -99,11 +91,11 @@ stops using the pointer then the shared pointer’s atomic counter is decremente
 and the other thread(s) may continue using it.  However, we usually join threads in the end. So that we know when they
 stop and do not need any of the resources shared with them.  It means that you probably need to pass a shared pointer to
 a thread only if you run a detached thread.  Or the thread that passes shared_ptr does not use it anymore. Though, in
-this case, you might prefer using `std::unique_ptr`.
+this case, you might prefer using `std::unique_ptr`. -->
 
+## Memory allocation ##
 
-## Shared pointer initialization ##
-This is the initialization of std::shared_ptr I usually see:
+This is the initialization of `std::shared_ptr` I usually see:
 
 ```cpp
 // let us assume that new int(42) does not throw
@@ -111,32 +103,28 @@ auto ptr = std::shared_ptr<int>(new int(42));
 ```
 
 What happens in the code?
-1. Memory in the heap is allocated for the integer 42 and its pointer is stored in the shared pointer’s *stored pointer*
-1. Memory in the heap is allocated for the reference counter and its pointer is stored in the second inner pointer of
-   the shared pointer
+
+1. The operator `new` allocates memory at the heap for the integer "42", and the shared pointer's constructor saves the pointer to this memory in the *stored pointer*
+1. The shared pointer's constructor allocates memory at the heap for the control block with the reference counter and saves it as another *internal pointer*
 
 Why is it bad?
-1. You make two memory allocations in the heap for one stored object
-1. The shared pointer’s data is located in two different parts of the heap. Which potentially may lead to a higher cache
-   miss rate. However, I haven’t succeeded to prove it yet
 
+1. The code does two memory allocations at the heap for a single object
+1. The shared pointer’s data is located in separate parts of the heap. Which potentially may lead to a higher cache miss rate.
 
-How to fix it?
-`std::make_shared` comes to help:
-
+How to fix it? `std::make_shared` comes to help:
 
 ```cpp
 auto ptr = std::make_shared<int>(42);
 ```
 
-
-It looks almost the same but this code makes __only one allocation of a contiguous piece of memory used for storing both
-the stored object and the reference counter__.
-The picture below shows the difference in the memory layout of shared pointers created in the two ways.
+It looks almost the same, but `make_shared` makes **only one allocation of a contiguous piece of memory used for storing both the stored object and the control block with the reference counter.** Afterward, `make_shared` calls [in place](https://en.cppreference.com/w/cpp/language/new#Placement_new) constructor for the stored object and control block.
+The picture below shows the difference in the memory layout of shared pointers created in two ways.
 
 ![Shared pointer memory layout](/img/shared_ptr_memory_map.png)
 
-Let us check the memory allocation with the following simple code:
+I prepared the following code that creates shared pointers in a loop using a constructor and `make_shared`.
+
 ```cpp
 #include <iostream>
 #include <memory>
@@ -172,8 +160,9 @@ int main(int argc, char *argv[]) {
 }
 ```
 
-Let’s check it with valgrind:
-<pre>
+To visualize the results, I run it inside Valgrind's "memcheck".
+
+```plain
 $valgrind --tool=memcheck ./memory_allocation.bin 1 100000
 ==3005== Memcheck, a memory error detector
 ==3005== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
@@ -184,7 +173,7 @@ test_shared_ptr
 ==3005==
 ==3005== HEAP SUMMARY:
 ==3005==     in use at exit: 0 bytes in 0 blocks
-==3005==   total heap usage: <span style="background-color: #FFFF00">200,003 allocs</span>, 200,003 frees, 4,873,728 bytes allocated
+==3005==   total heap usage: 200,003 allocs, 200,003 frees, 4,873,728 bytes allocated
 ==3005==
 ==3005== All heap blocks were freed -- no leaks are possible
 ==3005==
@@ -202,21 +191,23 @@ test_make_shared
 ==3010==
 ==3010== HEAP SUMMARY:
 ==3010==     in use at exit: 0 bytes in 0 blocks
-==3010==   total heap usage: <span style="background-color: #FFFF00">100,003 allocs</span>, 100,003 frees, 4,073,728 bytes allocated
+==3010==   total heap usage: <100,003 allocs, 100,003 frees, 4,073,728 bytes allocated
 ==3010==
 ==3010== All heap blocks were freed -- no leaks are possible
 ==3010==
 ==3010== For counts of detected and suppressed errors, rerun with: -v
 ==3010== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
-</pre>
+```
 
+The output shows *200,003* allocations when using the constructor versus *100,003* with `std::make_shared`.
+I would **recommend giving preference to `make_shared` over creating via the constructor**, except for the cases that will be covered later in this post.
+For more information `std::make_shared`, refer to [cppreference.com](https://en.cppreference.com/w/cpp/memory/shared_ptr/make_shared).
 
-As you may see there are **200,003 allocs** while using constructor versus **100,003 allocs** with `std::make_shared`.
-[More info about `std::make_shared`](https://en.cppreference.com/w/cpp/memory/shared_ptr/make_shared){:target="_blank"}
-
-
+<!-- Reviewed until this -->
 ## Reference cycles ##
-Consider the next piece of code:
+
+The following piece of code is a simplified example of a reference cycle. There is an instance of struct A that owns an instance of struct B when the instance of B owns the instance of A.
+
 ```cpp
 #include <iostream>
 #include <memory>
@@ -246,38 +237,38 @@ int main() {
 }
 ```
 
-Output:
-<pre>
+Ideally, after the flow exits the function `test`, the destructors of A and B would print their messages. However, the following output shows the opposite: the destructors are never called.
+
+```plain
 $ ./reference_cycle.bin
 $
-</pre>
+```
 
-Its output is empty which means the destructors are never called due to a reference cycle:
-`ptrA` points to `ptrB` and vice versa.
-Of course, the code is naive and a programmer may easily find and break the cycle.
-But if you have multiple shared objects passing from one
-class to another you can get in this situation.
-However, the problem of reference cycles is not new and in order to address
-it the C++ standard library provides `std::weak_ptr`.
+As mentioned above, the example is simple, and a seasoned developer can break the cycle by introducing a third class. However, reference cycles can contain a long chain of objects, making identifying them harder.
+
+When adding another type is not an option, the standard class has `weak_ptr`.
+A weak pointer does not own the object at the heap but only points to a shared pointer (the shared pointer's counter equals 1). To use the object via a weak pointer, a user has to call the `lock` method that creates an additional instance of the shared pointer. Thus, the caller becomes a co-owner of the object at the heap.
+
+In the code snippet below, B's shared pointer to A is replaced with `weak_ptr`.
 
 ```cpp
-struct B_;
+struct B;
 
 struct A_ {
-    ~A_() { std::cout << "dtor ~A_\n"; }
-    std::shared_ptr<B_> b;
+    ~A_() { std::cout << "dtor ~A\n"; }
+    std::shared_ptr<B> b;
 };
 
-struct B_ {
-    ~B_() { std::cout << "dtor ~B_\n"; }
+struct B {
+    ~B() { std::cout << "dtor ~B\n"; }
     // one of the pointers becomes weak
-    std::weak_ptr<A_> a;
+    std::weak_ptr<A> a;
 };
 
 void test_() {
-    auto ptrA = std::make_shared<A_>();
+    auto ptrA = std::make_shared<A>();
     std::cout << "A address: " << ptrA.get() << std::endl;
-    auto ptrB = std::make_shared<B_>();
+    auto ptrB = std::make_shared<B>();
     ptrA->b = ptrB;
     ptrB->a = ptrA;
     std::cout << "Number of references to A: "
@@ -294,49 +285,61 @@ int main() {
 }
 ```
 
-The output shows that all the destructors are called now:
+The output proves that both destructors are run on the exit of the flow.
 
-<pre>
+```plain
 $ ./reference_cycle.bin
 A address: 0x7f83564017d8
 Number of references to A: 1
 A address: 0x7f83564017d8
-dtor ~A_
-dtor ~B_
-</pre>
+dtor ~A
+dtor ~B
+```
 
-[More info about `std::weak_ptr`](https://en.cppreference.com/w/cpp/memory/weak_ptr){:target="_blank"}
-
-## `std::make_shared` together with `std::weak_ptr` ##
-So now we know that `std::make_shared` saves memory allocation and `std::weak_ptr` may prevent reference cycles.
-But what happens when we use them together?
+If no shared pointers are left, and the object is destructed, the weak pointers `lock` method returns a null shared pointer.
+It is essential to check the pointer before using it, and **the only thread-safe way to do it** is the following:
 
 ```cpp
-struct A_ {
-    // Let us add char buffer str to class A_
+auto new_shared = weak.lock();
+if (new_shared) {
+    new_shared->method();
+}
+```
+
+More infoformation about `std::weak_ptr`, refer to [cppreference.com](https://en.cppreference.com/w/cpp/memory/weak_ptr){:target="_blank"}
+
+## `std::make_shared` together with `std::weak_ptr` ##
+
+By now, we know that `std::make_shared` saves memory allocations, and `std::weak_ptr` can break reference cycles. But what happens when they are used together?
+
+In the next code sample, struct `B` did not change, but `A` is slightly different: now, it has an array of chars `str`. The method `create_make_shared_and_return_weak_ptr` creates the same initial reference cycle `A<=>B` and returns a weak and a raw pointer to the `A`. The routine `test_make_shared_with_weak` prints if the received weak pointer can acquire a strong pointer and how many pointers are left. Additionally, it prints the content of `A::str` using the raw pointer.
+
+```cpp
+struct A {
+    // Let us add char buffer str to class A
     char str[256];
-    A_() {
+    A() {
       strcpy(str, "AAAAAAAAA");
     }
-    ~A_() { std::cout << "dtor ~A_\n"; }
-    std::shared_ptr<B_> b;
+    ~A() { std::cout << "dtor ~A\n"; }
+    std::shared_ptr<B> b;
 };
 
-struct B_ {
-    ~B_() { std::cout << "dtor ~B_\n"; }
-    std::weak_ptr<A_> a;
+struct B {
+    ~B() { std::cout << "dtor ~B\n"; }
+    std::weak_ptr<A> a;
 };
 
-std::tuple<std::weak_ptr<A_>,A_*>
+std::tuple<std::weak_ptr<A>,A*>
 create_make_shared_and_return_weak_ptr() {
-    auto ptrA = std::make_shared<A_>();
-    std::cout << "A_ address: " << ptrA.get() << std::endl
-              << "A_::str = " << ptrA->str
+    auto ptrA = std::make_shared<A>();
+    std::cout << "A address: " << ptrA.get() << std::endl
+              << "A::str = " << ptrA->str
               << std::endl;
-    auto ptrB = std::make_shared<B_>();
+    auto ptrB = std::make_shared<B>();
     ptrA->b = ptrB;
     ptrB->a = ptrA;
-    std::cout << "Number of references to A_: " << ptrB->a.use_count()
+    std::cout << "Number of references to A: " << ptrB->a.use_count()
         << std::endl;
     return {ptrB->a, ptrB->a.lock().get()};
 }
@@ -346,11 +349,11 @@ void test_make_shared_with_weak() {
     std::cout << "Returned from create_make_shared_and_return_weak_ptr"
               << std::endl;
     auto strong = weak.lock();
-    std::cout << "Number of references to A_: "
+    std::cout << "Number of references to A: "
               << strong.use_count()
               << std::endl;
     std::cout << "Stored address: " << strong.get() << std::endl;
-    std::cout << "Value of A_::str stored by original address of A_: "
+    std::cout << "Value of A::str stored by original address of A: "
               << raw_ptr
               << " is: " << raw_ptr->str << std::endl;
 }
@@ -361,67 +364,51 @@ int main() {
 }
 ```
 
-In the code above the function `create_make_shared_and_return_weak_ptr` creates two shared pointers and then returns
-a copy of the weak pointer `ptrB->a` together with the raw pointer to the same object(it does not affect the results
-but we need it further).
-What do you expect to happen after the flow returns from `create_shared_and_return_weak_ptr`?
-We know that there were no reference cycles in the function and after exiting there are no instances of shared pointers.
-I’d expect the stored objects to be destructed and the memory released. But let’s see what happens:
+As a result of executing this test, the destructors of A and B are called, and the returned weak pointer states that there are no shared pointers left (`Number of references to A: 0`). Only the content of A's `str` is still untouched. Some operating systems do not clear the released memory but mark it as free. After I rewrote it with a custom free method that zeroed the memory, the result was the same -- the memory was never freed.
 
-
-<pre>
+```pre
 $ ./reference_cycle.bin
-A_ address: 0x7fd37ac01918
-A_::str = AAAAAAAAA
-Number of references to A_: 1
-dtor ~A_
-dtor ~B_
+Aaddress: 0x7fd37ac01918
+A::str = AAAAAAAAA
+Number of references to A: 1
+dtor ~A
+dtr ~B
 Returned from create_make_shared_and_return_weak_ptr
-Number of references to A_: 0
+Number of references to A: 0
 Stored address: 0x0
-Value of A_::str stored by original address of A_: 0x7fd37ac01918 is: AAAAAAAAA
-</pre>
-
-As you see the destructors are called and the weak pointer received from function
-`create_make_shared_and_return_weak_ptr` holds a null pointer which is expected.  Nevertheless, the value stored in
-the variable `A_::str` is still available by its original address(`0x7fc71ec01878`). How come???
-
+Value of A::str stored by original address of A: 0x7fd37ac01918 is: AAAAAAAAA
+```
 
 Here is the explanation from [cppreference.com](https://en.cppreference.com/w/cpp/memory/shared_ptr/make_shared){:target="_blank"}:
 > If any std::weak_ptr references the control block created by std::make_shared after the lifetime of all shared owners
 > ended, the memory occupied by T persists until all weak owners get destroyed as well, which may be undesirable if
 > sizeof(T) is large.
 
-Basically it means that the destructor `~A_()` is called explicitly but `delete` for the stored pointer is not!
-The reason is that a shared pointer created with `std::make_shared` stores both the stored object and control block in a
-contiguous piece of memory.
-As a result, the two can be deleted only together.
-But if there is any weak pointer the control block cannot be deleted otherwise the weak pointer would not have
-information about the reference count.
-So *the solution is to destruct the stored object but not to delete the whole memory block until there are weak pointers*.
+As mentioned before, `make_shared` saves the stored object and reference counter in a single piece of memory. On one hand, the weak pointers need access to the reference counter to track the availability of strong pointers. On the other, it is impossible to free a part of the memory allocated within one malloc call. The only possible solution is to call the object's destructor explicitly but only to clean the memory once there are no weak pointers left.
 
-Thus, C++ provides two very nice features but using them together may lead to inefficient code.
-However, if you use `std::weak_ptr` it might be a good idea to reconsider the design of your application.
+Thus, **`make_shared` and `weak_ptr` do not co-exist well.**
 
 ## Design problems ##
 
-So, for now, we know that shared pointer is relatively expensive to copy by value, requires specific instantiation to
-save memory allocations, and in the case of incorrect usage may lead to cycle references.
-And we already know most of the problems can be addressed by using the right language constructions.
+The most severe problem with shared pointers is not implementation nuances but the need for their usage. A shared pointer makes it almost impossible to track the owner of objects; shared ownership breaks the single-responsibility principle and, as Sean Parent said, makes the object at the heap a global variable because it is potentially accessible from everywhere.
 
-Despite this, there is another problem - design. In general, C++ is a language that expects a programmer to have full
-control of used resources and objects’ lifecycles. Shared pointers make the application’s memory model more complex and
-couplings between its parts are hard to track. Thus, the whole application becomes more bug-prone.
+I can think of only a few justified cases of using shared pointers.
 
+* Shared and weak pointers can be handy for implementing a generic cache mechanism, where the producer of the cache is not the only owner of cached data.
+* Boost Asio is another excellent example because ownership of objects in an asynchronous environment can be pretty complicated. This is probably the reason why most tutorials use shared pointers.
 
 ## Conclusion ##
-After reviewing all the cases above I came to the conclusion:
-* Try to follow the single ownership principle
-* Prefer to use objects with automatic storage duration
-* If you need a pointer, try using `unique_ptr`
-* If you have to use `shared_ptr` make sure you don’t overuse it and keep in mind it’s features
 
+Finally, I want to summarize the general recommendations for using a shared pointer.
+
+* Give preference to objects with automatic storage duration over any pointers
+* In case a pointer is needed, go first for the unique pointer
+* Bear in mind the overuse of shared pointers may lead to reference cycles
+* Prefer `make_shared` of the constructor to save memory allocations
+* Pass shared pointer by constant reference unless it is a separate thread
+* Check the pointer returned from `weak_ptr::lock` before using it
 
 ## Credits ##
+
 Thanks to [Sergey Pastukhov](https://www.linkedin.com/in/spastukhov/) and [Orian
 Zinger](https://www.linkedin.com/in/orian-zinger/) for help.
