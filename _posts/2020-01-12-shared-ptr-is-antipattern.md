@@ -312,7 +312,7 @@ More information about `std::weak_ptr`, refer to [cppreference.com](https://en.c
 
 By now, we know that `std::make_shared` saves memory allocations, and `std::weak_ptr` can break reference cycles. But what happens when they are used together?
 
-In the next code sample, struct `B` did not change, but `A` is slightly different: now, it has an array of chars `str`. The method `create_make_shared_and_return_weak_ptr` creates the same initial reference cycle `A<=>B` and returns a weak and a raw pointer to the `A`. The routine `test_make_shared_with_weak` prints if the received weak pointer can acquire a strong pointer and how many pointers are left. Additionally, it prints the content of `A::str` using the raw pointer.
+In the next code sample, struct `B` did not change, but `A` is slightly different: now, it has an array of characters `str`. The method `create_make_shared_and_return_weak_ptr` creates the same initial reference cycle `A<=>B` and returns a weak and a raw pointer to the `A`. The routine `test_make_shared_with_weak` prints if the received weak pointer can acquire a strong pointer and how many pointers are left. Additionally, it prints the content of `A::str` using the raw pointer.
 
 ```cpp
 struct A {
