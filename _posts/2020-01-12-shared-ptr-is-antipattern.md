@@ -403,8 +403,8 @@ Finally, I want to summarize the general recommendations for using a shared poin
 
 * Give preference to objects with automatic storage duration over any pointers
 * In case a pointer is needed, go first for the unique pointer
-* Bear in mind the overuse of shared pointers may lead to reference cycles
-* Prefer `make_shared` of the constructor to save memory allocations
+* Bear in mind that the overuse of shared pointers may lead to reference cycles
+* Prefer `make_shared` over the constructor to save memory allocations
 * Pass shared pointer by constant reference unless it is a separate thread
 * Check the pointer returned from `weak_ptr::lock` before using it
 
