@@ -408,6 +408,15 @@ Finally, I want to summarize the general recommendations for using a shared poin
 * Pass shared pointer by constant reference unless it is a separate thread
 * Check the pointer returned from `weak_ptr::lock` before using it
 
+## Update ##
+
+I have been honored with an invitation to speak at [Core C++ 2022](https://corecpp.org/) conference about this topic.
+You can check out my talk at YouTube:
+
+<div class="embed-youtube" data-nosnippet="true">
+<iframe width="560" height="315" src="https://www.youtube.com/embed/hI5iBXSDbTQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</div>
+
 ## Credits ##
 
 Thanks to [Sergey Pastukhov](https://www.linkedin.com/in/spastukhov/) and [Orian
