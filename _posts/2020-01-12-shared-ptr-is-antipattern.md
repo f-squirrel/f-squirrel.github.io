@@ -306,7 +306,7 @@ if (new_shared) {
 }
 ```
 
-More infoformation about `std::weak_ptr`, refer to [cppreference.com](https://en.cppreference.com/w/cpp/memory/weak_ptr){:target="_blank"}
+More information about `std::weak_ptr`, refer to [cppreference.com](https://en.cppreference.com/w/cpp/memory/weak_ptr){:target="_blank"}
 
 ## `std::make_shared` together with `std::weak_ptr` ##
 
