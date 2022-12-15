@@ -161,6 +161,19 @@ Besides those mentioned, my setup usually includes various plugins, depending on
 
 Some users might find the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb){:target="_blank"} extension useful, which provides a native debugger powered by LLDB to debug C++, Rust, and other compiled languages.
 
+## Update: How to share `devcontainer.json` in git repository
+
+The approach when users add their favorite plugins to `devcontainer.json` file does not work well when the file is part of the repository: everyone adds their plugins, and Git marks the file as "dirty." A possible solution is adding the file to `.gitignore`, but then every new developer setup needs a manual copy.
+
+The preferred solution is to keep only essential plugins in the `.devcontainer.json` file while adding the personal plugins to "Default Extensions" in VS Code's local settings:
+
+* Open Settings
+* Paste `dev.containers.defaultExtensions` to the Search field
+* Add `Extension ID` to the list
+* Rebuild container
+
+Thus, VS Code will install the default extensions in every devcontainer created by the user and keep the shared configuration clean.
+
 ## Additional information
 
 For complete information regarding the configurations available for the `.devcontainer.json` file, please refer to the official [page](https://code.visualstudio.com/docs/remote/containers#_create-a-devcontainerjson-file){:target="_blank"}.
