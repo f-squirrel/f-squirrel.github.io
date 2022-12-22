@@ -106,4 +106,9 @@ i1.has_value(): false
 s1.has_value(): false
 ```
 
+## Update
+
+Another option is to avoid using variables after they are moved out because, in many cases, it is bug-prone.
+C++ compilers do not warn users if a variable is used after a move. The only alternative I am familiar with is Clang-Tidy with [bugprone-use-after-move](https://clang.llvm.org/extra/clang-tidy/checks/bugprone/use-after-move.html) check turned on.
+
 *Special thanks to [Petar Ivanov](https://www.linkedin.com/in/petar-ivanov-37840224/) for the idea and [Rina Volovich](https://www.linkedin.com/in/rina-volovich/) for editing.*
