@@ -1,5 +1,5 @@
 ---
-title: Example
+title: Example of usage of shared_ptr for caching
 published: true
 permalink: "/usage-of-shared_ptr"
 tags: [cpp, shared_ptr]
@@ -156,9 +156,9 @@ The class `Config` receives a reference to the shared pointer and owns it only f
 This solution comes with several important caveats.
 
 - The values of configuration can be changed between calls to getters. If it is critical, need to extend the solution with an additional mutex for the whole `InnerConfig` object.
-- The methods `std::atomic_store` and `std::atomic_load` are not guaranteed to be lock-free. It can be verified in runtime via `std::atomic_is_lock_free`. For example, on my platform, it returns `false`. If the performance is critical, you need to do benchmarks and decide if the standard implementation is good enough.
+- The methods `std::atomic_store` and `std::atomic_load` are not guaranteed to be lock-free. It can be verified in runtime via `std::atomic_is_lock_free`. For example, on my platform, it returns `false`. If the performance is critical, you need to do benchmarks and decide if the standard implementation is good enough. For more information, please refer to [cppreference.com](https://en.cppreference.com/w/cpp/memory/shared_ptr/atomic).
 - Once a shared pointer is passed to one of the atomic functions, it cannot be accessed non-atomically.
-- The usage of `std::atomic_*` is deprecated in C++ 20 and replaced with `std::atomic<std::shared_ptr>`.
+- The usage of `std::atomic_*` is deprecated in C++ 20 and replaced with [`std::atomic<std::shared_ptr>`](https://en.cppreference.com/w/cpp/memory/shared_ptr/atomic2) with the same caveats.
 
 The complete source code is available in the Github [repository](https://github.com/f-squirrel/shared_config).
 
