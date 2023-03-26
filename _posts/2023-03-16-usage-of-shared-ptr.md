@@ -1,12 +1,12 @@
 ---
-title: Example of usage of shared_ptr for caching
+title: Using shared_ptr for reloadable config
 published: true
 permalink: "/usage-of-shared_ptr"
 tags: [cpp, shared_ptr]
 readtime: true
 ---
 
-After my post [std::shared_ptr is an anti-pattern](/shared-ptr-is-evil/) I was thinking about an example of justified usage of `std::shared_ptr`. I have mentioned that it can be used to implement caching, and in this post, I am going to elaborate on it.
+After my post [std::shared_ptr is an anti-pattern](/shared-ptr-is-evil/) I was thinking about an example of justified usage of `std::shared_ptr`. I have mentioned that it can be used to implement caching, and in this post, I am going to use it for implementing reloadable config.
 
 Imagine a situation when you need to develop an object shared across the system that can be arbitrarily updated. For example, there is a class representing a configuration of the application: it is created on the startup of the program and later updated via a watcher thread.
 
@@ -158,7 +158,7 @@ This solution comes with several important caveats.
 - Once a shared pointer is passed to one of the atomic functions, it cannot be accessed non-atomically.
 - The usage of `std::atomic_*` is deprecated in C++ 20 and replaced with [`std::atomic<std::shared_ptr>`](https://en.cppreference.com/w/cpp/memory/shared_ptr/atomic2) with the same caveats.
 
-The complete source code is available in GitHub [repository](https://github.com/f-squirrel/shared_config)](https://github.com/f-squirrel/shared_config).
+The complete source code is available in GitHub [repository](https://github.com/f-squirrel/shared_config).
 
 Please share your ideas in the comments.
 
