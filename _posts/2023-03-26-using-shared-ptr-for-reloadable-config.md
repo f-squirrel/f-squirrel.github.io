@@ -4,7 +4,7 @@ published: true
 permalink: "/usage-of-shared_ptr"
 tags: [cpp, shared_ptr]
 readtime: true
-share-img: /img/ISO_C++_Logo.svg
+share-img: /img/cpp_logo.png
 share-description: How to use std::shared_ptr for implementing reloadable configs
 ---
 
