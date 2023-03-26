@@ -6,11 +6,11 @@ tags: [cpp, shared_ptr]
 readtime: true
 ---
 
-After my post [std::shared_ptr is an anti-pattern](/shared-ptr-is-evil/) I have discovered a good example of the usage of `std::shared_ptr`. I have mentioned that this object can be used for the implementation of caching, and in this post, I am going to elaborate on it.
+After my post [std::shared_ptr is an anti-pattern](/shared-ptr-is-evil/) I was thinking about an example of justified usage of `std::shared_ptr`. I have mentioned that it can be used to implement caching, and in this post, I am going to elaborate on it.
 
 Imagine a situation when you need to develop an object shared across the system that can be arbitrarily updated. For example, there is a class representing a configuration of the application: it is created on the startup of the program and later updated via a watcher thread.
 
-This fact that the configuration object is used by many users, potentially located in multiple threads and updated in the watcher thread requires synchronization of the config.
+The fact that the configuration object is used by many users, potentially located in multiple threads and updated in the watcher thread requires synchronization of the config.
 
 The straightforward approach is to create a `Config` class with an inner mutex, locking on each access via getters and setters. However, this approach leads to quite a lot of work with mutexes which might be tedious and, often, bug-prone. Instead, I am going to use the atomic features of the shared pointer.
 
@@ -121,9 +121,7 @@ The class `ConfigManager` loads configuration data from a file and periodically 
 
 The `ConfigManager` constructor takes two parameters: the path to the configuration file and a time interval for reloading the configuration data. Upon construction, the `ConfigManager` reads the initial configuration data from the file and stores it in the `last_used_` string. It then parses the initial configuration data and creates a `std::shared_ptr` of type `InnerConfig`, which is stored in the `inner_config_` member variable. Finally, it starts a background thread (`watcher_`) that periodically checks if the configuration file has been updated and, if so, reloads the configuration data and updates the `inner_config_` member variable.
 
-The `ConfigManager` class provides a `get()` method that returns a `Config` object that provides read-only access to the current configuration data stored in `inner_config_`.
-
-The `Config` class provides a read-only interface to `InnerConfig` through the `name()` and `version()` methods.
+The `ConfigManager` class provides a `get()` method that returns a `Config` object that provides read-only access to the current configuration data stored in `inner_config_` through methods `name()` and `version()`.
 
 ```cpp
 class Config {
@@ -147,7 +145,7 @@ private:
 
 The important feature of this code is the use of `std::atomic_store` and `std::atomic_load` functions to safely update the `InnerConfig` object with the latest configuration values. These functions provide atomic operations that ensure that the shared data is accessed in a thread-safe manner. Specifically, `std::atomic_store` atomically stores a new value to a shared variable, and `std::atomic_load` atomically loads the current value of a shared variable.
 
-In the `watch` function, when a new configuration is read from the file, it is parsed into an `InnerConfig` object and stored in a new shared pointer. This shared pointer is then atomically loaded and stored using `std::atomic_store`. The `Config` object accesses the loaded `InnerConfig` object through the load function, which uses `std::atomic_load` to safely access the shared pointer.
+In the `watch` function, when a new configuration is read from the file, it is parsed into an `InnerConfig` object and stored in a new shared pointer. This shared pointer is then atomically loaded and stored using `std::atomic_store`. The `Config` object accesses the loaded `InnerConfig` object through the `load` function, which uses `std::atomic_load` to safely access the shared pointer.
 
 Using `std::atomic_store` and `std::atomic_load` ensures that the `InnerConfig` object is safely updated and accessed by multiple threads. Without these atomic operations, there could be race conditions and data inconsistencies when multiple threads access and modify the shared InnerConfig object concurrently.
 
@@ -160,7 +158,7 @@ This solution comes with several important caveats.
 - Once a shared pointer is passed to one of the atomic functions, it cannot be accessed non-atomically.
 - The usage of `std::atomic_*` is deprecated in C++ 20 and replaced with [`std::atomic<std::shared_ptr>`](https://en.cppreference.com/w/cpp/memory/shared_ptr/atomic2) with the same caveats.
 
-The complete source code is available in the Github [repository](https://github.com/f-squirrel/shared_config).
+The complete source code is available in GitHub [repository](https://github.com/f-squirrel/shared_config)](https://github.com/f-squirrel/shared_config).
 
 Please share your ideas in the comments.
 
