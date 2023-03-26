@@ -4,6 +4,8 @@ published: true
 permalink: "/usage-of-shared_ptr"
 tags: [cpp, shared_ptr]
 readtime: true
+share-img: /img/ISO_C++_Logo.svg
+share-description: How to use std::shared_ptr for implementing reloadable configs
 ---
 
 After my post [std::shared_ptr is an anti-pattern](/shared-ptr-is-evil/) I was thinking about an example of justified usage of `std::shared_ptr`. I have mentioned that it can be used to implement caching, and in this post, I am going to use it for implementing reloadable config.
