@@ -131,7 +131,7 @@ public:
     Config(const std::shared_ptr<const InnerConfig> &inner_config)
         : inner_config_{inner_config} {}
 
-    [[nodiscard]] const std::string &name() const { return load()->name(); }
+    [[nodiscard]] std::string name() const { return load()->name(); }
     [[nodiscard]] uint16_t version() const { return load()->version(); }
 
 private:
@@ -163,5 +163,7 @@ This solution comes with several important caveats.
 The complete source code is available in GitHub [repository](https://github.com/f-squirrel/shared_config).
 
 Please share your ideas in the comments.
+
+Update: Fixed a dangling reference in `Config::name` by returning by value, thanks to [dustyhome](https://www.reddit.com/r/cpp/comments/122udm0/comment/jdw5x11/?utm_source=share&utm_medium=web2x&context=3).
 
 *Special thanks to [Sergey Pastukhov](https://www.linkedin.com/in/spastukhov/) for pinpointing a critical issue.*
