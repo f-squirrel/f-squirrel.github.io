@@ -15,52 +15,63 @@ However, my `grep/sed/awk` command set did not work despite the printed output i
 ![docker logo](/img/docker-logo-696x364.png)
 
 This is a simplified version of the command:
-<pre>
+
+```sh
 $docker exec -it container_name echo "Hello”
 Hello
-</pre>
+```
+
 As you may see, the output looks very normal. I decided to print the output with C-styled escaped characters using the
 [od](https://man7.org/linux/man-pages/man1/od.1.html){:target="_blank"} utility:
-<pre>
+
+```sh
 $docker exec -it container_name echo "Hello" | od -c
 0000000    H   e   l   l   o  \r  \n
 0000007
-</pre>
+```
+
 You may notice that the output contains the carriage return character(`\r`)!
-<br>In contrast, the `ssh` output does not:
-<pre>
+In contrast, the `ssh` output does not:
+
+```sh
 $ssh user@remote_server "echo Hello" | od -c
 0000000    H   e   l   l   o  \n
 0000006
-</pre>
+```
 
 In order to understand where the difference comes from, we need to take a look at the parameters of `docker exec -it`.
-<br>By default, docker containers have only `STDOUT` attached, therefore a container’s output is printed to the host’s terminal.
+By default, docker containers have only `STDOUT` attached, therefore a container’s output is printed to the host’s terminal.
 If a user needs to send an input to the container, the container has to have `STDIN` open. In order to do so, you need to run `docker exec -i` or `docker exec --interactive=true`.
 It is likely that most applications don’t need more parameters except those that use the `TTY` features, such as text coloring or `curses`. To provide them with this ability, the container has to run with `-t` or `--tty=true`.
 A good example of such an application is `vim`. The only way to use `vim` inside a container is to run/execute the container with `-it`.
-<br><span style="background-color: #FFFF00">It seems that the default behavior of tty is to add the carriage return.</span>
+
+_It seems that the default behavior of tty is to add the carriage return._
 
 In my case, I did not actually need `STDIN` nor `TTY`, so I ran the container without `-it`:
-<pre>
+
+```sh
 $docker exec container_name echo "Hello" | od -c
 0000000    H   e   l   l   o  \n
 0000006
-</pre>
+```
+
 The result is **no carriage return**!
 
 In case you do need `TTY` but don’t want the carriage return, there are a few options:
 Delete `\r` from the container’s output using [tr](https://linux.die.net/man/1/tr){:target="_blank"}:
-<pre>
-$docker exec -it container_name echo "Hello" | <span style="background-color: #00CC66">tr -d '\r'</span> | od -c
+
+```sh
+$docker exec -it container_name echo "Hello" | tr -d '\r' | od -c
 0000000    H   e   l   l   o  \n
 0000006
-</pre>
+```
+
 Configure the container’s `TTY` to translate newline to carriage return-newline:
-<pre>
-$docker exec -it container_name /bin/bash -c "<span style="background-color: #00CC66">stty -onlcr</span> && echo 'Hello'" | od -c
+
+```sh
+$docker exec -it container_name /bin/bash -c "stty -onlcr && echo 'Hello'" | od -c
 0000000    H   e   l   l   o  \n
 0000006
-</pre>
+```
 
 Note: all of the above applies to `docker run` as well.
