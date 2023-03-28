@@ -9,7 +9,6 @@ readtime: true
 
 This is the second post about debugging with strace.
 
-
 In our solution, we have a process that runs another process.
 The parent communicates with the child process via TCP socket.
 In order to know whether the child is ready for communication the parent reads
