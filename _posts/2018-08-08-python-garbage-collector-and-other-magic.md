@@ -58,9 +58,7 @@ $
 
 As the reader may know, Python’s garbage collector destroys objects not referenced from the stack(1 or fewer references).
 
-
 Despite we create only one instance of the object in the line #30 and do not copy it elsewhere, I propose to verify the number of references with `sys.getrefcount`:
-
 
 ```python
 #Listing #2
@@ -88,6 +86,7 @@ As you see, every time we create an instance of `OsPipeHolder` Python creates **
 So, maybe there is an internal reference inside the object itself.
 
 In order to check it I have decided to print the information on all the attributes of `OsPipeHolder`:
+
 ```python
 #Listing #3
 
@@ -126,6 +125,7 @@ At first glance everything looks good, but in the line #22 we see that `isClosed
 This is the inner reference cycle we were looking for!
 
 Let’s comment it out:
+
 ```python
 #Listing #4
 
@@ -143,11 +143,13 @@ class OsPipeHolder(object):
 ```
 
 Run results #4:
-```
+
+```sh
 $ ./OsPipeHolder.py
 Refcount: 1
 You've deleted me!!!
 ```
+
 Yey, finally our method `__del__` was called!
 
 But we still have two issues:
@@ -158,6 +160,7 @@ But we still have two issues:
 Let’s start with the first.<br>
 I found the solution in Python sources.
 In order to create an alias to a function you simply declare `isClosed` as a "class level attribute"(line #16).
+
 ```python
 #Listing #5
 
@@ -219,13 +222,14 @@ Python documentation is your best friend and has an answer for everything!
 > By default, this list contains only objects with `__del__()` methods.
 > [1](https://docs.python.org/2/library/gc.html#id2) Objects that have `__del__()` methods and are part of a reference cycle
 > cause the entire reference cycle to be uncollectable,
-> including objects not necessarily in the cycle but reachable only from it. 
-> 
+> including objects not necessarily in the cycle but reachable only from it.
+>
 > *Python docs: [https://docs.python.org/2/library/gc.html#gc.garbage](https://docs.python.org/2/library/gc.html#gc.garbage){:target="_blank"}*
 
 As you see, the `__del__` method itself was the root cause!
 
 ## Summary ##
+
 * Don’t create aliases with `self` since it leads to a redundant
 reference(only `alias = method_name` and not `self.alias = self.method_name`)
 * Remember the Zen of Python saying: “Explicit is better than implicit.” (call `close` method explicitly or use the `with` statement)
