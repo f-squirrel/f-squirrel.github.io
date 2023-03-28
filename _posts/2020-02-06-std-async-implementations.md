@@ -9,7 +9,9 @@ readtime: true
 
 
 ## Intro ##
-Recently, I have been reviewing the function `std::async` and decided to get a better understanding.<br>
+
+Recently, I have been reviewing the function `std::async` and decided to get a better understanding.
+
 The C++ standard says:
 > The function template async provides a mechanism to launch a function potentially in a new thread and provides the
 > result of the function in a future object with which it shares a shared state.
@@ -32,20 +34,20 @@ int main() {
 }
 ```
 
-
 There are two launch policies, which define whether a function is launched in a separate thread or not:
 `std::launch::async` and `std::launch::deferred`.
+
 * If the `async` flag is set, then a callable function will be executed in a separate thread.
 * If the `deferred` flag is set, a callable function will be stored together with its arguments, but the
 `std::async` function __will not launch a new thread__. Moreover, the callable function will be executed if either
 `future::get()` or `future::wait()` is called.
 * If neither of flags is set, it is up to the implementation to decide which policy to choose.
 
-
 ## In Essence, what is the Default Policy? ##
 
-Let us understand which policy is the default in the major implementations of the C++ standard library.<br>
-In **GCC**, the [default option](https://github.com/gcc-mirror/gcc/blob/a1c9c9ff06ab15e697d5bac6ea6e5da2df840cf5/libstdc%2B%2B-v3/include/std/future){:target="_blank"} is `launch::async|launch::deferred`:
+Let us understand which policy is the default in the major implementations of the C++ standard library.
+
+In __GCC__, the [default option](https://github.com/gcc-mirror/gcc/blob/a1c9c9ff06ab15e697d5bac6ea6e5da2df840cf5/libstdc%2B%2B-v3/include/std/future){:target="_blank"} is `launch::async|launch::deferred`:
 
 ```cpp
 /// async, potential overload
@@ -54,8 +56,8 @@ template<typename _Fn, typename... _Args>
   async(_Fn&& __fn, _Args&&... __args)
   {
     return std::async(launch::async|launch::deferred,
-  		std::forward<_Fn>(__fn),
-  		std::forward<_Args>(__args)...);
+    std::forward<_Fn>(__fn),
+    std::forward<_Args>(__args)...);
   }
 ```
 
@@ -69,35 +71,34 @@ In actuality, the chosen policy will be  `launch::async` (lines 11 and 27):
     {
       std::shared_ptr<__future_base::_State_base> __state;
       if ((__policy & launch::async) == launch::async)
-	{
-	  __try
-	    {
-	      __state = __future_base::_S_make_async_state(
-		  std::thread::__make_invoker(std::forward<_Fn>(__fn),
-					      std::forward<_Args>(__args)...)
-		  );
-	    }
+ {
+   __try
+     {
+       __state = __future_base::_S_make_async_state(
+    std::thread::__make_invoker(std::forward<_Fn>(__fn),
+           std::forward<_Args>(__args)...)
+    );
+     }
 #if __cpp_exceptions
-	  catch(const system_error& __e)
-	    {
-	      if (__e.code() != errc::resource_unavailable_try_again
-		  || (__policy & launch::deferred) != launch::deferred)
-		throw;
-	    }
+   catch(const system_error& __e)
+     {
+       if (__e.code() != errc::resource_unavailable_try_again
+    || (__policy & launch::deferred) != launch::deferred)
+  throw;
+     }
 #endif
-	}
+ }
       if (!__state)
-	{
-	  __state = __future_base::_S_make_deferred_state(
-	      std::thread::__make_invoker(std::forward<_Fn>(__fn),
-					  std::forward<_Args>(__args)...));
-	}
+ {
+   __state = __future_base::_S_make_deferred_state(
+       std::thread::__make_invoker(std::forward<_Fn>(__fn),
+       std::forward<_Args>(__args)...));
+ }
       return future<__async_result_of<_Fn, _Args...>>(__state);
     }
 ```
 
-<br>
-[**LLVM**](https://github.com/llvm-mirror/libcxx/blob/78d6a7767ed57b50122a161b91f59f19c9bd0d19/include/future){:target="_blank"}
+[__LLVM__](https://github.com/llvm-mirror/libcxx/blob/78d6a7767ed57b50122a161b91f59f19c9bd0d19/include/future){:target="_blank"}
  has a special launch policy, `launch::any`, for the default option:
 
 ```cpp
@@ -152,8 +153,7 @@ async(launch __policy, _Fp&& __f, _Args&&... __args)
 }
 ```
 
-<br>
-The same can be concluded for [**MSVC's**](https://github.com/microsoft/STL/blob/b3504262fe51b28ca270aa2e05146984ef758428/stl/inc/future){:target="_blank"} default policy:
+The same can be concluded for [__MSVC's__](https://github.com/microsoft/STL/blob/b3504262fe51b28ca270aa2e05146984ef758428/stl/inc/future){:target="_blank"} default policy:
 
 ```cpp
 template <class _Ret, class _Fty>
@@ -170,15 +170,18 @@ _Associated_state<typename _P_arg_type<_Ret>::type>* _Get_associated_state(
 ```
 
 It can therefore be confirmed that, at least for now, all three implementations **have the same default launch policy,
-which is `launch::async`.**
+which is `launch::async`.
 
 ## Using std::async with Default Options ##
 
 If the default option is used, it is unknown which policy will be chosen. “So what? The compiler knows better!” you may
-say.<br> But what will happen if a callable function locks mutexes or stores variables with the
+say.
+
+But what will happen if a callable function locks mutexes or stores variables with the
 [_thread_local_](https://en.cppreference.com/w/cpp/keyword/thread_local){:target="_blank"} storage duration?
 A change in the default mode might then affect your application dramatically.
 If the default policy is changed from `async` to `deferred`,
+
 * The `thread_local` variables will use the values from the previous executions of a callable function.
 * The locking of mutexes inside of a callable function may lead to a deadlock.
 
@@ -189,9 +192,9 @@ may get shared with other threads, which may lead to data races.
 
 For now, we know that if no policy is specified, then `std::async` launches a callable function in a separate thread.
 However, the C++ standard does not specify whether the thread is a new one or reused from a thread pool.
-Let us see how each of the three implementations launches a callable function.<br>
+Let us see how each of the three implementations launches a callable function.
 
-**GCC** calls `__future_base::_S_make_async_state`, which creates an instance of `_Async_state_impl`. Its constructor launches a new `std::thread` (line 12):
+__GCC__ calls `__future_base::_S_make_async_state`, which creates an instance of `_Async_state_impl`. Its constructor launches a new `std::thread` (line 12):
 
 ```cpp
 // Shared state created by std::async().
@@ -208,20 +211,21 @@ template<typename _BoundFn, typename _Res>
   _M_thread = std::thread{ [this] {
       __try
         {
-  	_M_set_result(_S_task_setter(_M_result, _M_fn));
+   _M_set_result(_S_task_setter(_M_result, _M_fn));
         }
       __catch (const __cxxabiv1::__forced_unwind&)
         {
-  	// make the shared state ready on thread cancellation
-  	if (static_cast<bool>(_M_result))
-  	  this->_M_break_promise(std::move(_M_result));
-  	__throw_exception_again;
+   // make the shared state ready on thread cancellation
+   if (static_cast<bool>(_M_result))
+     this->_M_break_promise(std::move(_M_result));
+   __throw_exception_again;
         }
       } };
     }
 ```
 
-**LLVM** calls `_VSTD::__make_async_assoc_state`, which does the same: launches a new `std::thread`(line 11):
+__LLVM__ calls `_VSTD::__make_async_assoc_state`, which does the same: launches a new `std::thread`(line 11):
+
 ```cpp
 template <class _Rp, class _Fp>
 future<_Rp>
@@ -238,8 +242,7 @@ __make_async_assoc_state(_Fp __f)
 }
 ```
 
-
-**MSVC** creates an instance of `_Task_async_state`, which creates a concurrency task and passes a callable function there:
+__MSVC__ creates an instance of `_Task_async_state`, which creates a concurrency task and passes a callable function there:
 
 ```cpp
 // CLASS TEMPLATE _Task_async_state
@@ -263,13 +266,13 @@ public:
 `::Concurrency::create_task` is part of [Microsoft’s Parallel Patterns
 Library](https://docs.microsoft.com/en-us/cpp/parallel/concrt/parallel-patterns-library-ppl?view=vs-2019){:target="_blank"}.
 According to [MSDN](https://docs.microsoft.com/en-us/cpp/parallel/concrt/task-parallelism-concurrency-runtime?view=vs-2019){:target="_blank"},
-_the `task` class uses the **Windows ThreadPool** as its scheduler, not the Concurrency Runtime_.
-<br>
+_the `task` class uses the __Windows ThreadPool__ as its scheduler, not the Concurrency Runtime_.
+
 I assume that Microsoft engineers decided to use the thread pool because thread creation is a relatively heavy
 operation. Additionally, spawning many threads may exhaust the operating system.
 
-
 ## Summary ##
+
 The bottom line is that `std::async` is a very useful feature. It makes asynchronous operations simpler and the code
 much cleaner, though a few potential problems can be identified:
 
