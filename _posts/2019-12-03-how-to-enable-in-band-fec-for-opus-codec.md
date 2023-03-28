@@ -51,20 +51,20 @@ first time with FEC turned on to reproduce the lost packet, and then with FEC tu
 ```c
 /* Decode the lost packet */
 opus_decoder_ctl(decoder, OPUS_GET_LAST_PACKET_DURATION(frame_size));
-opus_decode(	decoder,
-		buffer, /* buffer to decode */,
-		length, /* number of bytes in buffer */
-		sampv,  /* output buffer */
-		frame_size,
-		1);   /* in-band FEC is turned on */
+opus_decode(decoder,
+            buffer, /* buffer to decode */,
+            length, /* number of bytes in buffer */
+            sampv,  /* output buffer */
+            frame_size,
+            1);     /* in-band FEC is turned on */
 play_buffer(buffer);
 /*Decode the current packet*/
-opus_decode(	decoder,
-		buffer, /* buffer to decode */,
-		length, /* number of bytes in buffer */
-		sampv,  /* output buffer */
-		frame_size,
-		0);   /* in-band FEC is turned off */
+opus_decode(decoder,
+            buffer, /* buffer to decode */,
+            length, /* number of bytes in buffer */
+            sampv,  /* output buffer */
+            frame_size,
+            0);     /* in-band FEC is turned off */
 play_buffer(buffer);
 ```
 
@@ -72,13 +72,13 @@ play_buffer(buffer);
 
 We learned how to enable in-band FEC for Opus codec but the last thing to talk about is the pros and cons of using it!
 
-### Pros: ###
+### Pros ###
 
 * No need to develop an inhouse mechanism of adding FEC to your packets.
 * Most of the third parties like SIP servers(Asterisk) or WebRTC support Opus in-band FEC out of the box.
 * FEC may increase the audio quality even when there is a packet loss.
 
-### Cons: ###
+### Cons ###
 
 * Tricky to configure.
 * There is no obvious way to see if traffic actually carries in-band FEC except generating packet loss and listening to
