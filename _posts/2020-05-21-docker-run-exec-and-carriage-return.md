@@ -76,3 +76,5 @@ $docker exec -it container_name /bin/bash -c "stty -onlcr && echo 'Hello'" | od 
 ```
 
 Note: all of the above applies to `docker run` as well.
+
+Please share your thoughts on [LinkedIn](https://www.linkedin.com/posts/ddanilov_docker-activity-6669324289147248640-mD22?utm_source=share&utm_medium=member_desktop).

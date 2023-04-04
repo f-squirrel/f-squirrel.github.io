@@ -168,3 +168,5 @@ Please share your ideas in the comments.
 Update: Fixed a dangling reference in `Config::name` by returning by value, thanks to [dustyhome](https://www.reddit.com/r/cpp/comments/122udm0/comment/jdw5x11/?utm_source=share&utm_medium=web2x&context=3).
 
 *Special thanks to [Sergey Pastukhov](https://www.linkedin.com/in/spastukhov/) for pinpointing a critical issue.*
+
+Please share your thoughts on [Twitter](https://twitter.com/dbdanilov/status/1640052185781133313?s=20), [Reddit](https://www.reddit.com/r/cpp/comments/122udm0/using_shared_ptr_for_reloadable_config/) or [LinkedIn](https://www.linkedin.com/posts/ddanilov_using-sharedptr-for-reloadable-config-activity-7045819011908931584-a0vG?utm_source=share&utm_medium=member_desktop).

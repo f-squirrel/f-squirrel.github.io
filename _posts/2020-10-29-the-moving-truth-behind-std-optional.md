@@ -112,3 +112,5 @@ Another option is to avoid using variables after they are moved out because, in 
 C++ compilers do not warn users if a variable is used after a move. The only alternative I am familiar with is Clang-Tidy with [bugprone-use-after-move](https://clang.llvm.org/extra/clang-tidy/checks/bugprone/use-after-move.html) check turned on.
 
 *Special thanks to [Petar Ivanov](https://www.linkedin.com/in/petar-ivanov-37840224/) for the idea and [Rina Volovich](https://www.linkedin.com/in/rina-volovich/) for editing.*
+
+Please share your thoughts on [Twitter](https://twitter.com/dbdanilov/status/1321880543315845122?s=20) or [LinkedIn](https://www.linkedin.com/posts/ddanilov_cpp-cplusplus-activity-6727646045565661184-yVaZ?utm_source=share&utm_medium=member_desktop).

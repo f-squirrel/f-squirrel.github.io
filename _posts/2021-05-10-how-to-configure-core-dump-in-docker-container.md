@@ -19,8 +19,9 @@ The generic method is to set the system's core pattern, which consists of a path
 about a process that crashed. In the below example, I use the following pattern:
 
 ```plain
-$ echo '/tmp/core.%e.%p' | sudo tee /proc/sys/kernel/core_pattern
+echo '/tmp/core.%e.%p' | sudo tee /proc/sys/kernel/core_pattern
 ```
+
 * `/tmp` - directory where the files will be saved
 * `core` - prefix of core's filename
 * `%e` - process name
@@ -35,8 +36,8 @@ For more details about core pattern configuration, please refer to the [man page
 > lead to a [security
 > breach](https://www.trendmicro.com/en_us/research/19/l/why-running-a-privileged-container-in-docker-is-a-bad-idea.html){:target="_blank"}.
 
-
 The following sample application crashes immediately:
+
 ```cpp
 #include <cstdlib>
 
@@ -52,6 +53,7 @@ int main() {
 
 The Dockerfile presented below will be used to build the image for our sample application: it installs
 the build-essentials, GDB (needed for future use), copies source code, and builds the application.
+
 ```docker
 FROM ubuntu:18.04
 
@@ -71,6 +73,7 @@ CMD ["/src/app"]
 ```
 
 Now let us run the application:
+
 ```plain
 $ docker run \
         --init \
@@ -86,6 +89,7 @@ generated in the container remain available after the container is stopped or de
 set in the core pattern!*
 
 After the application has crashed, the core dumps can be found in the host's `/tmp` directory:
+
 ```plain
 $ ls /tmp/core*
 /tmp/core.app.6
@@ -101,12 +105,14 @@ $ docker run \
         application:latest \
         bash
 ```
+
 * `-it` - launch the container in interactive mode.
 * `--mount type=bind,source=/tmp/,target=/tmp/`- the core location is mounted the same way as before.
 * `bash` - this time, the application running in the container is bash.
 
 Usually, docker images do not contain source code and in this
 case, the source code directory needs to be mounted as well:
+
 ```plain
 $ docker run \
         -it \
@@ -117,11 +123,13 @@ $ docker run \
 ```
 
 Eventually, inside of the container, run GDB:
+
 ```plain
 root@1679288711ff:/src# gdb app /tmp/core.app.6
 ```
 
 Once GDB is ready, run `bt` to view the backtrace:
+
 ```plain
 (gdb) bt
 #0  __GI_raise (sig=sig@entry=6) at ../sysdeps/unix/sysv/linux/raise.c:51
@@ -133,3 +141,5 @@ Once GDB is ready, run `bt` to view the backtrace:
 The backtrace will conveniently lead you straight to the source of the issue which caused the application to crash.
 
 P.S. docker-compose supports all flags that have been referenced in this post.
+
+Please share your thoughts on [Twitter](https://twitter.com/dbdanilov/status/1391843816156631050?s=20) or [LinkedIn](https://www.linkedin.com/posts/ddanilov_configuring-core-dumps-in-docker-dmitry-activity-6797608842315214848-xjba?utm_source=share&utm_medium=member_desktop).

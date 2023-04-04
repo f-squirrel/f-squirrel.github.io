@@ -286,3 +286,5 @@ ThreadPool_ instead of launching new ones.
 situations.
 * The difference in the implementations may lead to unexpected behavior after the code is ported between GCC/LLVM and
 MSVC.
+
+Please share your thoughts on [LinkedIn](https://www.linkedin.com/posts/ddanilov_implementations-of-stdasync-and-how-they-activity-6633020851841183744-u-d_?utm_source=share&utm_medium=member_desktop).

@@ -61,3 +61,5 @@ $make
                      ^
 cc1plus: all warnings being treated as errors
 </pre>
+
+Please share your thoughts on [LinkedIn](https://www.linkedin.com/posts/ddanilov_cpplus-activity-6707398283444146176-raKg?utm_source=share&utm_medium=member_desktop).

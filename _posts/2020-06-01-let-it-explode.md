@@ -150,3 +150,5 @@ So let it explode and fear not of core dumps!
 
 Note:
 Reliance on core dumps is a viable option only if the system is configured to generate them and they are accessible.
+
+Please share your thoughts on [LinkedIn](https://www.linkedin.com/posts/ddanilov_cpp-cplusplus-activity-6673490005106806784-GP9J?utm_source=share&utm_medium=member_desktop).
