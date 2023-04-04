@@ -5,6 +5,7 @@ permalink: "/google-docs-and-cpp11/"
 tags: [cpp, fun]
 share-img: /img/Google-Docs-Header-1280x720-1.png
 readtime: true
+comments: false
 ---
 
 

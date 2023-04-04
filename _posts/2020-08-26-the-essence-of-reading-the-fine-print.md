@@ -6,6 +6,7 @@ share-img: /img/fine-print.png
 share-description: "Tips on how to make your compiler strictly follow the C++ standard"
 tags: [cpp, variable-length array, gcc, clang]
 readtime: true
+comments: false
 ---
 
 I was recently investigating a bug and would like to share an unexpected, yet interesting discovery regarding the cause of the issue.

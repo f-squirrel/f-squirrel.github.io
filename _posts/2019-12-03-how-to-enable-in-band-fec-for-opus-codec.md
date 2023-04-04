@@ -6,6 +6,7 @@ share-img: /img/How-to-Test-Packet-Loss-on-Windows.png
 share-description: "Minimal steps to enable in-band FEC for OPUS codec"
 tags: [udp, opus, fec, rtcp, rtp]
 readtime: true
+comments: false
 ---
 
 As a reader may know UDP network protocol does not support either message retransmission or acknowledge.  It means that

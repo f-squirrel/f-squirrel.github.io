@@ -6,6 +6,7 @@ share-img: /img/docker-logo-696x364.png
 share-description: "Deep dive into the mechanism of signal handling in docker containers"
 tags: [docker, libc, linux, signals, sigsegv, sigabrt, c, kernel, init, abort]
 readtime: true
+comments: false
 ---
 
 In my previous [post](/how-to-contain-a-crashed-container/), I provided insight on the importance of running docker with the
@@ -38,9 +39,9 @@ Then it sends `SIGABRT` (line 13):
   if (stage == 1)
     {
       /* This stage is special: we must allow repeated calls of
-	 `abort' when a user defined handler for SIGABRT is installed.
-	 This is risky since the `raise' implementation might also
-	 fail but I don't see another possibility.  */
+  `abort' when a user defined handler for SIGABRT is installed.
+  This is risky since the `raise' implementation might also
+  fail but I don't see another possibility.  */
       int save_stage = stage;
 
       stage = 0;
@@ -53,7 +54,7 @@ Then it sends `SIGABRT` (line 13):
     }
 ```
 
-If the application does not have a user-defined signal handler (which my program in[ the previous post](/how-to-contain-a-crashed-container/) did
+If the application does not have a user-defined signal handler (which my program in[the previous post](/how-to-contain-a-crashed-container/) did
 not), then it should be caught by the default signal handler, i.e. the kernel.
 
 Since my program's container was started without
@@ -93,7 +94,6 @@ It then makes the last attempt to send the signal:
 ```
 
 As expected, sending the signal again does not help.
-
 
 As a natural response to a consistently failing methodology, `abort` tries a different approach, where it attempts to execute a platform-specific command to terminate the
 process:
@@ -145,6 +145,7 @@ This message shows the process “app” with the PID 109848 (the program's PID 
 Glibc (libc-2.27.so) that tried to execute the `HLT` instruction.
 
 ## Conclusion
+
 Unless your application has user-defined signal handlers, it is strongly advised and encouraged to run a
 container with the `--init` flag as a safety measure, as this tiny docker-implemented init process will enable default signal handling for
 your application and reap zombie processes.

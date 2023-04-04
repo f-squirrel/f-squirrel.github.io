@@ -7,6 +7,7 @@ share-img: /img/1200px-Rust_programming_language_black_logo.svg.png
 readtime: true
 permalink: "/how-to-overwrite-a-file-in-rust"
 share-description: "Nuances of writing to files in Rust"
+comments: false
 ---
 
 Recently, I took an interest in the Rust programming language due to its performance and safety.<br>
@@ -25,6 +26,7 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 ```
+
 The original content of the file was `AAAAAAAA` and after execution of the
 program, it unexpectedly became `XXXAAAAA` rather than just `XXX`. I was quite surprised because in most of the languages that I am familiar with, when a file is opened with the write (`"w"`) flag, the existing content would be automatically truncated and overwritten. Apparently, to achieve the same in
 Rust, `truncate(true)` needs to be added:
@@ -34,4 +36,3 @@ std::fs::OpenOptions::new().write(true).truncate(true).open("./file")?;
 ```
 
 I like the granularity of file settings provided by Rust via low-level flags, such as `O_WRONLY` and `O_TRUNC`, but beginners need to be aware of them.
-
