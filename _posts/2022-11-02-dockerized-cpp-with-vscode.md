@@ -6,6 +6,7 @@ share-img: /img/docker_vscode.png
 readtime: true
 permalink: "/dockerized-cpp-build-with-vscode"
 share-description: How to configure VS Code to work with dockerized builds
+comments: false
 ---
 
 After I published [Dockerized build environments for C/C++ projects](/dockerized-cpp-build){:target="_blank"}, I was approached on a few occasions, both online and offline, with questions regarding my IDE/text editor setup.

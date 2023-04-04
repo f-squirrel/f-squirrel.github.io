@@ -16,6 +16,7 @@ tags: [
     docker-compose,
 ]
 readtime: true
+comments: false
 ---
 
 In an earlier post of mine [“Let it explode!”](/let-it-explode/), we explored "handling" certain exceptions via
@@ -36,6 +37,7 @@ int main() {
 ```
 
 Dockerfile:
+
 ```docker
 FROM ubuntu:18.04
 
@@ -70,6 +72,7 @@ termination.
 
 During my research, I was able to find an open [issue](https://github.com/moby/moby/issues/30593){:target="_blank"} on the `SIGABRT`
 dilemma and a comment with the following workaround using bash:
+
 ```docker
 CMD ["bash", "-c", "/src/app ; exit $(echo $?)"]
 ```
@@ -101,4 +104,3 @@ from version 2.4 and onward.
 _For a detailed explanation on signal handling in docker, please have a look at
 my next article [How signals are handled in a docker
 container](/how-signals-are-handled-in-a-docker-container)._
-

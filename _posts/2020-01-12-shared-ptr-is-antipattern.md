@@ -6,6 +6,7 @@ permalink: "/shared-ptr-is-evil/"
 share-description: "Nuances of the implementation of std::shared_ptr, its drawbacks, and best practices"
 tags: [cpp, shared_ptr, weak_ptr, pointer]
 readtime: true
+comments: false
 ---
 
 ## A bit of history ##

@@ -4,6 +4,7 @@ published: true
 permalink: "/let-it-explode/"
 tags: [cpp, exceptions, gdb, debugging]
 readtime: true
+comments: false
 ---
 
 Exceptions are an inherent part of modern C++.

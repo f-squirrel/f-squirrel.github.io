@@ -7,6 +7,7 @@ share-img: /img/rust.png
 readtime: true
 permalink: "/panic-in-rust"
 share-description: "Various process terminating methodologies using panic! in Rust"
+comments: false
 ---
 
 The Rust programming language provides a few ways to terminate a program when it reaches an unrecoverable state by calling

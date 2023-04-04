@@ -5,6 +5,7 @@ permalink: "/using-strace-for-debugging/"
 share-img: /img/Strace_logo-156x300.png
 tags: [strace, debugging, linux]
 readtime: true
+comments: false
 ---
 
 Debugging is an important part of software engineering and every

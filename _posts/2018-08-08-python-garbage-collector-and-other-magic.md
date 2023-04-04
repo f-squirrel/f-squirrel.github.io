@@ -5,6 +5,7 @@ permalink: "/python-garbage-collector-and-other-magic/"
 cover-img: /img/python_garbage_collection_header.jpeg
 tags: [python, debugging, garbage collection]
 readtime: true
+comments: false
 ---
 
 Once upon a time, in the company where I work there was a bug in production that caused to the `Too many files open` error.
