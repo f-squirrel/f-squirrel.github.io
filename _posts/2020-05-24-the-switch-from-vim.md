@@ -76,3 +76,5 @@ Local macOS environment:
 Connected to a remote instance:
 
 ![Remote connection](/img/neovim-qt-remote.png)
+
+Please share your thoughts on [LinkedIn](https://www.linkedin.com/posts/ddanilov_vim-neovim-activity-6670601427926216705-s0xD?utm_source=share&utm_medium=member_desktop).

@@ -36,3 +36,6 @@ std::fs::OpenOptions::new().write(true).truncate(true).open("./file")?;
 ```
 
 I like the granularity of file settings provided by Rust via low-level flags, such as `O_WRONLY` and `O_TRUNC`, but beginners need to be aware of them.
+
+
+Please share your thoughts on [Twitter](https://twitter.com/dbdanilov/status/1371754759720435715?s=20).

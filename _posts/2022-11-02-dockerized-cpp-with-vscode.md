@@ -182,3 +182,5 @@ For complete information regarding the configurations available for the `.devcon
 As usual, the example [project](https://github.com/f-squirrel/dockerized_cpp_build_example){:target="_blank"} on Github is updated with the docker configuration described in this post.
 
 *Special thanks to [Rina Volovich](https://www.linkedin.com/in/rina-volovich/) for editing.*
+
+Please share your thoughts on [Twitter](https://twitter.com/dbdanilov/status/1588077740380639233?s=20), [Reddit](https://www.reddit.com/r/cpp/comments/ykvqhq/vs_code_with_dockerized_build_environments_for_cc/?utm_source=share&utm_medium=web2x&context=3) or [LinkedIn](https://www.linkedin.com/posts/ddanilov_vs-code-with-dockerized-build-environments-activity-6993843011386265600-ecEg?utm_source=share&utm_medium=member_desktop).

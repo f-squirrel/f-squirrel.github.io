@@ -104,3 +104,5 @@ from version 2.4 and onward.
 _For a detailed explanation on signal handling in docker, please have a look at
 my next article [How signals are handled in a docker
 container](/how-signals-are-handled-in-a-docker-container)._
+
+Please share your thoughts on [Twitter](https://twitter.com/dbdanilov/status/1328270769563062273?s=20) or [LinkedIn](https://www.linkedin.com/posts/ddanilov_docker-linux-signals-activity-6734035710958944256-nhSf?utm_source=share&utm_medium=member_desktop).
