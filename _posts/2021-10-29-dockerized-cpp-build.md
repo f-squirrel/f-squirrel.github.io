@@ -310,7 +310,7 @@ In general, this is not an issue because developers could always "chmod" the res
 However, running docker containers as root is not a good practice from the security perspective and, what is more important,
 it might be an issue if one of the targets changes the source code. It is common to format code or apply clang-tidy fixes via make commands. This would result in having source files under the root user, which makes it impossible to edit them at the host.
 
-In order to solve the issue, I have updated the sources of the dockerized build so that it runs the container as the host user by providing the current user id and group id. From now on, this is the default behavior, if you need to change it, run make as follows:
+In order to solve the issue, I have updated the sources of the dockerized build so that it runs the container as the host user by [providing](https://github.com/f-squirrel/dockerized_cpp/blob/master/Makefile#L32) the current user id and group id. From now on, this is the default behavior, if you need to change it, run make as follows:
 
 ```sh
 make DOCKER_USER_ROOT=ON
