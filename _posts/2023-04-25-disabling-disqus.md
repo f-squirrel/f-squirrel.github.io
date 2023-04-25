@@ -2,6 +2,7 @@
 title: Disabling Disqus comments
 published: true
 permalink: "/disabling-disqus-comments"
+share-img: /img/no-ads.png
 tags: [ads, disqus]
 readtime: true
 comments: false
