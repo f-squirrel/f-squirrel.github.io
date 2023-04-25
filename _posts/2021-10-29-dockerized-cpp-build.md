@@ -303,6 +303,21 @@ You can check out my talk and live demo at YouTube:
 
 You can read about configuring VS Code to work with dockerized C/C++ build in my latest [post](/dockerized-cpp-build-with-vscode).
 
+## Update #3 -- Running as a non-root user in Docker
+
+The original version of the dockerized build ran as the root user.
+In general, this is not an issue because developers could always "chmod" the result file.
+However, running docker containers as root is not a good practice from the security perspective and, what is more important,
+it might be an issue if one of the targets changes the source code. It is common to format code or apply clang-tidy fixes via make commands. This would result in having source files under the root user, which makes it impossible to edit them at the host.
+
+In order to solve the issue, I have updated the sources of the dockerized build so that it runs the container as the host user by providing the current user id and group id. From now on, this is the default behavior, if you need to change it, run make as follows:
+
+```sh
+make DOCKER_USER_ROOT=ON
+```
+
+It is important to note that the docker image does not contain the host's user, i.e. there is no home directory, name or group. It means that if your build uses the home directory, then probably this mode is not good for you.
+
 *Special thanks to [Rina Volovich](https://www.linkedin.com/in/rina-volovich/) for editing.*
 
 Please share your thoughts on [Twitter](https://twitter.com/dbdanilov/status/1454109694776299527?s=20), [Reddit](https://www.reddit.com/r/cpp/comments/qly3iy/dockerized_build_environments_for_cc_projects/?utm_source=share&utm_medium=web2x&context=3) or [LinkedIn](https://www.linkedin.com/posts/ddanilov_dockerized-build-environments-for-cc-projects-activity-6859875172300685312-gkl2?utm_source=share&utm_medium=member_desktop).
