@@ -14,10 +14,10 @@ However, this solution has one disadvantage: due to its static nature, there is 
 So I decided to add an external comment provider Disqus, fortunately, my Jekyll theme supported it out of the box.
 You add their Javascript code to the website and the code loads the comments into a page.
 The official website says that the free plan may add some advertisements. Well, this is fair, I thought.
-What I did not expect was to see 4 pages of ads at the bottom of each page after two years of usage.
+What I did not expect was to see four pages of ads at the bottom of each page after two years of usage.
 I assume that my blog has reached the minimum number of visitors, and Disqus decided that the time has come.
-As I said, was prepared to see some ads, but two pages are too much, to say the least.
+As I said, was prepared to see some ads, but four pages are too much, to say the least.
 
-As a result, I am disabling Disqus comments except for the posts that already have comments. Most of the old posts have links to social networks, and all the new ones (including this post) will have links to Twitter, Reddit, and LinkedIn. I would be happy to see your comments there!
+As a result, I am disabling Disqus comments except for the posts that already have comments. Most of the old posts have links to social networks, and all the new ones (including this one) will have links to Twitter, Reddit, and LinkedIn. I would be happy to see your comments there!
 
 Please share your thoughts on [Twitter](https://twitter.com/dbdanilov/status/1640052185781133313?s=20), [Reddit](https://www.reddit.com/r/cpp/comments/122udm0/using_shared_ptr_for_reloadable_config/) or [LinkedIn](https://www.linkedin.com/posts/ddanilov_using-sharedptr-for-reloadable-config-activity-7045819011908931584-a0vG?utm_source=share&utm_medium=member_desktop).
