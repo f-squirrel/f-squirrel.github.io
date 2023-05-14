@@ -1,0 +1,55 @@
+---
+title: Thoughts about microservices
+published: true
+permalink: "/thoughts-about-microservices"
+tags: [design, archirecture, microservices]
+readtime: true
+comments: false
+---
+
+Several friends sent me the link to a [post][1] about Amazon Prime switching from microservices to a monolith. It seems like this change of paradigm has triggered a lot of debates in the network, so I decided to share my thoughts on the topic.
+
+The dawn of microservices was a response to the mounting challenges faced by traditional monolithic architectures. As businesses began to expand at an unprecedented pace, the scalability limitations of these monolithic systems became increasingly apparent. At this critical juncture, Amazon emerged as a pioneering force, demonstrating the potential of a new architectural approach: microservices.
+
+In the Amazon paradigm, software applications were no longer viewed as unwieldy monoliths, but as collections of loosely coupled, independently deployable services. Each microservice served a specific function and could be developed, deployed, and scaled independently. This architectural shift offered a level of flexibility and resilience that was previously unattainable, particularly when it came to scalability.
+
+Impressed by the advantages demonstrated by Amazon, many Internet companies quickly followed suit. They recognized that this new approach could help them better manage complexity, improve system resilience, and speed up deployment times. The era of microservices had begun, setting the stage for a transformative period in the realm of software development.
+
+Since the microservices became popular, I as an engineer, was constantly seeing projects that would separate their apps into microservices just for microservice's sake, extracting every little functionality into an additional service, or lambda. This was supposed magically solve all their technical issues: poor understanding of the problem they were trying to solve, bad design or incompetent developers. Moreover, the lack of microservices would be an excuse for why a million users did not use the product every single second. And Amazon, as the biggest cloud provider, would be only happy to support their decision to adopt the new architecture.
+With proprietary message brokers, storage services, and tracing implementations to prevent the clients from switching to other providers.
+
+Microservices promoted at least one new job title: DevOps.
+Originally DevOps had nothing to do with the cloud, but who remembers that? Eventually, every little company needed a DevOps, software architect, a solution architect, and a few other architects. Otherwise, who would remember how all your thousand microservices talk to each other or how to deploy this monstrosity?
+
+Right before the whole industry jumps back to monolith just because "microservices are not cool anymore" or "FAANG use monolith". I would like to look closer at the Amazon Prime case.
+
+The first bottleneck was related to orchestration management, which I am not an expert in. But it sounds a bit like an issue of AWS itself to me.
+However, the second one looked more interesting. Let me quote here:
+
+> The second cost problem we discovered was about the way we were passing video frames (images) around different components. To reduce computationally expensive video conversion jobs, we built a microservice that splits videos into frames and temporarily uploads images to an Amazon Simple Storage Service (Amazon S3) bucket. Defect detectors (where each of them also runs as a separate microservice) then download images and processed it concurrently using AWS Lambda. However, the high number of Tier-1 calls to the S3 bucket was expensive.
+
+I have never worked in Amazon but I do have some experience in the video and audio industry. It sounds obvious to me that a video processing system requires a quick communication channel able to transfer big video frames. Especially if the processing has anything to do with near-real time. Since the processing most probably happens on a GPU, the time spent on it becomes small relative to the time spent on transfer. Just imagine, that the sender has to copy the frame from user space to kernel space, send it over the network (friends, it is expensive even inside the same region or whatever), and do the same in the opposite order at the receiver side. Oh, and save and flush to the quickest file system S3, but still a filesystem. And resend it again. I am surprised they hit the problem only now. The solution is groundbreaking: to avoid the expensive data transfer, it is implemented within the same process.
+
+While this shift in architecture seems justified, I would like to mention a few things in defense of microservices.
+
+Microservices do help companies to decouple components and, what is more important, teams working on them. It is a very satisfying thought that the bug you might creating right now will be isolated in this very component. No crazy people coming to you with "According to **our** logs the root cause is at **your** side".
+The overhead of adding a new API endpoint often leads people to think twice before designing it, the internal communication framework makes interfaces more formal, and uniform, with clear APIs. It leaves less room for dangerous cutting corners.
+
+According to Amazon's article, the new architecture reuses the same components as before. It means the merge of microservices into a single instance was easy, probably because of the clear interfaces of the original design.
+
+If the system is I/O bound (most of the web services, data proxies, and storage systems) or even-driven, the network-based APIs are the simplest way to achieve asynchronicity.
+Most languages provide async/await support that offloads the complexity of implementation to the kernel and userspace async schedulers.
+The only alternative I am familiar with is thread-based: with producer-consumer queues in the best case or direct usage of mutexes in the worst. It never ends well, though. Multithreading is too complicated.
+
+I am a big fan of unit testing, it allows developers to ensure the behavior of every component, and to mock certain classes or functions, but in many cases, it is often not sufficient. It is often hard to test the interaction between bigger components. It might be done via end-to-end tests which are easier to create for isolated components.
+
+In the end, I would like to remind that changing architecture is a dramatic milestone in a product's life.
+For the last 30 years, the industry moved from structured programming to object-oriented, and then to functional, from complied languages to dynamic ones. All these technologies are good but none of them was a silver bullet.
+So if the whole industry shifts to a new direction, it does not mean that it will fit your needs.
+In conclusion, if you've identified that microservices are at the heart of your project's difficulties, here are some points to ponder before deciding to overhaul your system completely to a monolithic architecture.
+
+1. If your service is primarily I/O bound, a switch may not be the best course of action. It's likely that a monolithic architecture won't provide the solution to your problems.
+2. if you're experiencing slow network communication, consider consolidating multiple services on the same instance. This way, communication will occur through the loopback, potentially improving speed and efficiency.
+3. If consolidating multiple services does not sufficiently speed up communication, another strategy is to create a drop-in replacement for the existing network API-based communication framework. This substitute should facilitate asynchronous in-process communication. To further improve efficiency, relocate the services that are most tightly interlinked into a single process and utilize the newly-developed framework to establish connections between them.
+
+[1]: https://www.primevideotech.com/video-streaming/scaling-up-the-prime-video-audio-video-monitoring-service-and-reducing-costs-by-90
