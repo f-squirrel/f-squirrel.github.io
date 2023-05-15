@@ -30,6 +30,8 @@ However, the second one looked more interesting. Let me quote here:
 
 I have never worked in Amazon but I do have some experience in the video and audio industry. It sounds obvious to me that a video processing system requires a quick communication channel able to transfer big video frames. Especially if the processing has anything to do with near-real time. Since the processing most probably happens on a GPU, the time spent on it becomes small relative to the time spent on transfer. Just imagine, that the sender has to copy the frame from user space to kernel space, send it over the network (friends, it is expensive even inside the same region or whatever), and do the same in the opposite order at the receiver side. Oh, and save and flush to the quickest file system S3, but still a filesystem. And resend it again. I am surprised they hit the problem only now. The solution is groundbreaking: to avoid the expensive data transfer, it is implemented within the same process.
 
+Ironically, very soon after migrating to the monolith, Amazon engineers realized that the vertical scale was not good enough and had to run multiple instances of the new monolith to extend capacity. Additionally, they have had to implement a lightweight orchestration to manage them. I wonder if the new orchestration may become a new bottleneck.
+
 While this shift in architecture seems justified, I would like to mention a few things in defense of microservices.
 
 Microservices do help companies to decouple components and, what is more important, teams working on them. It is a very satisfying thought that the bug you might creating right now will be isolated in this very component. No crazy people coming to you with "According to **our** logs the root cause is at **your** side".
