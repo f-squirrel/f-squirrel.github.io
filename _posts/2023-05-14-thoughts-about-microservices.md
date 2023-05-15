@@ -1,8 +1,8 @@
 ---
-title: Thoughts about microservices
+title: Thoughts about microservices and monoliths
 published: true
 permalink: "/thoughts-about-microservices"
-tags: [design, archirecture, microservices]
+tags: design, architecture, microservices]
 readtime: true
 comments: false
 ---
