@@ -21,7 +21,7 @@ Since microservices became popular, as an engineer, I was constantly seeing proj
 Microservices promoted at least one new job title: DevOps.
 Originally DevOps had nothing to do with the cloud, but who remembers that? Eventually, every little company needed a DevOps, software architect, a solution architect, and a few other architects. Otherwise, who would remember how all your thousand microservices talk to each other or how to deploy this monstrosity?
 
-Right before the whole industry jumps back to monolith just because "microservices are not cool anymore" or "FAANG use monolith". I would like to look closer at the Amazon Prime case.
+Before the whole industry jumps back to monolith just because "microservices are not cool anymore" or "FAANG use monolith", I would like to look closer at the Amazon Prime case.
 
 The first bottleneck was related to orchestration management, which I am not an expert in. But it sounds a bit like an issue of AWS itself to me.
 However, the second one looked more interesting. Let me quote here:
