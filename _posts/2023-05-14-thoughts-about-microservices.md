@@ -34,8 +34,8 @@ Ironically, very soon after migrating to the monolith, Amazon engineers realized
 
 While this shift in architecture seems justified, I would like to mention a few things in defense of microservices.
 
-Microservices do help companies to decouple components and, what is more important, teams working on them. It is a very satisfying thought that the bug you might creating right now will be isolated in this very component. No crazy people coming to you with "According to **our** logs the root cause is at **your** side".
-The overhead of adding a new API endpoint often leads people to think twice before designing it, the internal communication framework makes interfaces more formal, and uniform, with clear APIs. It leaves less room for dangerous cutting corners.
+Microservices do help companies to decouple components and, what is more important, teams working on them. It is a very satisfying thought that the bug you might creating right now will be isolated in this very component. The overhead of adding a new API endpoint often leads people to think twice before designing it, the internal communication framework makes interfaces more formal, and uniform, with clear APIs. It leaves less room for dangerous cutting corners.
+No crazy people calling your code outside of the event-dispatch loop only because the language allows it. The separation of microservices allows choosing a programming language per component. Yes, if your developers advocate RDD (resume driver development) you might end up with dozens of languages. Nevertheless, it is sad to see C++ code struggling with I/O and Python with threads only because the project is a monolith process implemented in a single language.
 
 According to Amazon's article, the new architecture reuses the same components as before. It means the merge of microservices into a single instance was easy, probably because of the clear interfaces of the original design.
 
