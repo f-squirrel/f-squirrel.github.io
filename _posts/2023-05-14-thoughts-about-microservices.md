@@ -54,4 +54,8 @@ In conclusion, if you've identified that microservices are at the heart of your 
 2. if you're experiencing slow network communication, consider consolidating multiple services on the same instance. This way, communication will occur through the loopback, potentially improving speed and efficiency.
 3. If consolidating multiple services does not sufficiently speed up communication, another strategy is to create a drop-in replacement for the existing network API-based communication framework. This substitute should facilitate asynchronous in-process communication. To further improve efficiency, relocate the services that are most tightly interlinked into a single process and utilize the newly-developed framework to establish connections between them.
 
+Please share your thoughts on [Twitter][2], or [LinkedIn][3].
+
 [1]: https://www.primevideotech.com/video-streaming/scaling-up-the-prime-video-audio-video-monitoring-service-and-reducing-costs-by-90
+[2]: https://twitter.com/dbdanilov/status/1658194978852462592?s=46&t=LTvfKK96g7tvjHHSr9v4cQ
+[3]: https://www.linkedin.com/posts/ddanilov_my-thoughts-on-microservices-and-monoliths-activity-7063960143113199616-4wR_
