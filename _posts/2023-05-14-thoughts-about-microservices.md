@@ -7,7 +7,8 @@ readtime: true
 comments: false
 ---
 
-Several friends sent me the link to a [post][1] about Amazon Prime switching from microservices to a monolith. It seems like this change of paradigm has triggered a lot of debates in the network, so I decided to share my thoughts on the topic.
+Recently, several friends directed my attention to an intriguing [article][1] detailing Amazon Prime's transition from a microservices architecture back to a monolith.
+It seems like this change of paradigm has triggered a lot of debates in the network, so I decided to share my thoughts on the topic.
 
 The dawn of microservices was a response to the mounting challenges faced by traditional monolithic architectures. As businesses began to expand at an unprecedented pace, the scalability limitations of these monolithic systems became increasingly apparent. At this critical juncture, Amazon emerged as a pioneering force, demonstrating the potential of a new architectural approach: microservices.
 
