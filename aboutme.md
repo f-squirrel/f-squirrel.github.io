@@ -18,7 +18,7 @@ Bachelor's and Masters's in Computer Engineering. I have been living and working
 Israel for the last {{years_in_israel}} years.
 I am currently employed at GK8, a leading cyber security company specializing in blockchain security, as a Software Team Manager.
 My career has spanned both global corporations, such as VMware, HP, and small-to-mid-scale startups like LiveU.
-with increased frequency as I pinpointed my technological interests
+I have been blogging with increased frequency as I pinpointed my technological interests
 more and more.
 My summarized interests and the general categories for my blog posts can be found below:
 
