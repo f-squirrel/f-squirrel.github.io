@@ -47,23 +47,23 @@ And now, ladies and gentlemen,
 
 Exhibit A:
 
-<pre>
-$make
-/home/user/example/main.cpp:7:16: <span style="background-color: #FFFF00">error: variable length arrays are a C99 feature [-Werror,-Wvla-extension]</span>
+```sh
+$ make
+/home/user/example/main.cpp:7:16: error: variable length arrays are a C99 feature [-Werror,-Wvla-extension]
     char buffer[size];
                ^
 1 error generated.
-</pre>
+```
 
 Exhibit B:
 
-<pre>
-$make
-/home/user/example/main.cpp:7:21: <span style="background-color: #FFFF00">error: ISO C++ forbids variable length array ‘buffer’ [-Werror=vla]</span>
+```sh
+$ make
+/home/user/example/main.cpp:7:21: error: ISO C++ forbids variable length array ‘buffer’ [-Werror=vla]
      char buffer[size];
                      ^
 cc1plus: all warnings being treated as errors
-</pre>
+```
 
 **Update:**
 
