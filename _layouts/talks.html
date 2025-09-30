@@ -1,0 +1,42 @@
+---
+layout: page
+---
+
+{{ content }}
+
+<div class="talks-list">
+    {% for talk in site.data.talks %}
+    <article class="talk-preview">
+
+        <h2 class="post-title">{{ talk.title }}</h2>
+
+        <p class="post-meta">
+            <i class="fas fa-map-marker-alt" aria-hidden="true"></i>
+            <a href="{{ talk.venue_url }}">{{ talk.venue }}</a>
+            <span class="d-none d-md-inline middot">&middot;</span>
+            {% assign date_format = site.date_format | default: "%B %-d, %Y" %}
+            {{ talk.date | date: date_format }}
+        </p>
+
+        <div class="talk-description">
+            {{ talk.description | markdownify }}
+        </div>
+
+        {% if talk.youtube_id %}
+        <div class="embed-youtube">
+            <iframe width="560" height="315" src="https://www.youtube.com/embed/{{ talk.youtube_id }}"
+                title="YouTube video player" frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen>
+            </iframe>
+        </div>
+        {% endif %}
+
+    </article>
+
+    {% unless forloop.last %}
+    <hr>
+    {% endunless %}
+
+    {% endfor %}
+</div>
