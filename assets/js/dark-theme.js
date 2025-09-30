@@ -68,28 +68,44 @@ var ThemeToggle = {
     },
 
     loadTheme: function () {
+        // Check if theme was already applied by inline script
+        var currentTheme = document.documentElement.getAttribute('data-theme');
         var savedTheme = localStorage.getItem('theme');
         var theme = savedTheme || this.getSystemTheme();
-        this.setTheme(theme);
+
+        // If theme is already applied, just update the toggle button
+        if (currentTheme) {
+            this.updateToggleButton(currentTheme);
+        } else {
+            // Apply theme if not already set
+            this.setTheme(theme);
+        }
     },
 
-    setTheme: function (theme) {
-        var html = document.documentElement;
+    updateToggleButton: function (theme) {
         var toggleButton = document.querySelector('.theme-toggle');
-
-        if (theme === 'dark') {
-            html.setAttribute('data-theme', 'dark');
-            if (toggleButton) {
+        if (toggleButton) {
+            if (theme === 'dark') {
                 toggleButton.innerHTML = '<i class="fas fa-sun"></i>';
                 toggleButton.setAttribute('aria-label', 'Toggle light theme');
-            }
-        } else {
-            html.removeAttribute('data-theme');
-            if (toggleButton) {
+            } else {
                 toggleButton.innerHTML = '<i class="fas fa-moon"></i>';
                 toggleButton.setAttribute('aria-label', 'Toggle dark theme');
             }
         }
+    },
+
+    setTheme: function (theme) {
+        var html = document.documentElement;
+
+        if (theme === 'dark') {
+            html.setAttribute('data-theme', 'dark');
+        } else {
+            html.removeAttribute('data-theme');
+        }
+
+        // Update toggle button appearance
+        this.updateToggleButton(theme);
 
         // Save theme preference
         localStorage.setItem('theme', theme);
