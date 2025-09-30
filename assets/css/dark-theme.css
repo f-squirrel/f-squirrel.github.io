@@ -1,0 +1,312 @@
+/* Dark Theme Styles */
+
+/* Root variables inherit from Jekyll configuration for light theme */
+
+[data-theme="dark"] {
+    /* Dark theme */
+    --bg-color: #1a1a1a;
+    --text-color: #e0e0e0;
+    --navbar-bg: #2d2d2d;
+    --navbar-text: #e0e0e0;
+    --navbar-border: #404040;
+    --link-color: #66b3ff;
+    --hover-color: #4da6ff;
+    --footer-bg: #2d2d2d;
+    --footer-text: #b0b0b0;
+    --footer-link: #e0e0e0;
+    --code-bg: #2d2d2d;
+    --code-text: #e0e0e0;
+    --border-color: #404040;
+    --blockquote-border: #666;
+    --blockquote-bg: #2d2d2d;
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] body {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Navbar styles */
+[data-theme="dark"] .navbar-custom {
+    background-color: #2d2d2d;
+    border-bottom: 1px solid #404040;
+    transition: background-color 0.3s ease;
+}
+
+[data-theme="dark"] .navbar-custom .navbar-brand,
+[data-theme="dark"] .navbar-custom .navbar-nav .nav-link {
+    color: #e0e0e0;
+    transition: color 0.3s ease;
+}
+
+[data-theme="dark"] .navbar-custom .navbar-nav .nav-link:hover,
+[data-theme="dark"] .navbar-custom .navbar-nav .nav-link:focus {
+    color: #4da6ff;
+}
+
+/* Links */
+[data-theme="dark"] a {
+    color: #66b3ff;
+    transition: color 0.3s ease;
+}
+
+[data-theme="dark"] a:hover,
+[data-theme="dark"] a:focus {
+    color: #4da6ff;
+}
+
+/* Footer */
+[data-theme="dark"] footer {
+    background-color: #2d2d2d;
+    color: #b0b0b0;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+[data-theme="dark"] footer a {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] footer a:hover {
+    color: #4da6ff;
+}
+
+/* Code blocks */
+[data-theme="dark"] pre,
+[data-theme="dark"] code {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+[data-theme="dark"] .highlight {
+    background-color: #2d2d2d;
+}
+
+[data-theme="dark"] .highlight pre {
+    background-color: transparent;
+}
+
+/* Borders and dividers */
+[data-theme="dark"] .border,
+[data-theme="dark"] hr,
+[data-theme="dark"] .table,
+[data-theme="dark"] .table th,
+[data-theme="dark"] .table td {
+    border-color: #404040;
+}
+
+/* Blockquotes */
+[data-theme="dark"] blockquote {
+    border-left: 5px solid #666;
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Cards and panels */
+[data-theme="dark"] .card,
+[data-theme="dark"] .panel {
+    background-color: #1a1a1a;
+    border-color: #404040;
+    color: #e0e0e0;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Theme toggle button */
+.theme-toggle {
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: color 0.3s ease, opacity 0.3s ease;
+    display: flex;
+    align-items: center;
+    text-decoration: none !important;
+}
+
+.theme-toggle:hover {
+    opacity: 0.8;
+    text-decoration: none !important;
+}
+
+.theme-toggle:focus {
+    outline: none;
+    text-decoration: none !important;
+}
+
+/* Dark theme specific navbar adjustments */
+[data-theme="dark"] .navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28224, 224, 224, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+[data-theme="dark"] .dropdown-menu {
+    background-color: #2d2d2d;
+    border-color: #404040;
+}
+
+[data-theme="dark"] .dropdown-item {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .dropdown-item:hover,
+[data-theme="dark"] .dropdown-item:focus {
+    background-color: #404040;
+    color: #4da6ff;
+}
+
+/* Post content adjustments */
+[data-theme="dark"] .post-preview {
+    border-bottom-color: #404040;
+}
+
+[data-theme="dark"] .post-preview .post-title {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .post-preview .post-subtitle {
+    color: #b0b0b0;
+}
+
+[data-theme="dark"] .post-preview .post-meta {
+    color: #b0b0b0;
+}
+
+/* Social links */
+[data-theme="dark"] .list-inline-item a {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .list-inline-item a:hover {
+    color: #4da6ff;
+}
+
+/* Image borders and shadows */
+[data-theme="dark"] .avatar-img-border,
+[data-theme="dark"] img {
+    border-color: #404040;
+}
+
+/* Form elements */
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border-color: #404040;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+    background-color: #1a1a1a;
+    border-color: #66b3ff;
+}
+
+/* Tag styling */
+[data-theme="dark"] .tag-btn {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border-color: #404040;
+}
+
+[data-theme="dark"] .tag-btn:hover {
+    background-color: #404040;
+    color: #4da6ff;
+}
+
+/* Pagination */
+[data-theme="dark"] .pagination .page-link {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border-color: #404040;
+}
+
+[data-theme="dark"] .pagination .page-link:hover {
+    background-color: #404040;
+    color: #4da6ff;
+}
+
+[data-theme="dark"] .pagination .page-item.active .page-link {
+    background-color: #66b3ff;
+    border-color: #66b3ff;
+    color: #1a1a1a;
+}
+
+/* Ensure readability of text */
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4,
+[data-theme="dark"] h5,
+[data-theme="dark"] h6 {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] p,
+[data-theme="dark"] li,
+[data-theme="dark"] td,
+[data-theme="dark"] th {
+    color: #e0e0e0;
+}
+
+/* Special case for syntax highlighting - preserve existing colors but adjust background */
+[data-theme="dark"] .highlight .hll {
+    background-color: #49483e
+}
+
+[data-theme="dark"] .highlight .c {
+    color: #75715e
+}
+
+/* Comment */
+[data-theme="dark"] .highlight .err {
+    color: #960050;
+    background-color: #1e0010
+}
+
+/* Error */
+[data-theme="dark"] .highlight .k {
+    color: #66d9ef
+}
+
+/* Keyword */
+[data-theme="dark"] .highlight .l {
+    color: #ae81ff
+}
+
+/* Literal */
+[data-theme="dark"] .highlight .n {
+    color: #f8f8f2
+}
+
+/* Name */
+[data-theme="dark"] .highlight .o {
+    color: #f92672
+}
+
+/* Operator */
+[data-theme="dark"] .highlight .p {
+    color: #f8f8f2
+}
+
+/* Punctuation */
+[data-theme="dark"] .highlight .cm {
+    color: #75715e
+}
+
+/* Comment.Multiline */
+[data-theme="dark"] .highlight .cp {
+    color: #75715e
+}
+
+/* Comment.Preproc */
+[data-theme="dark"] .highlight .c1 {
+    color: #75715e
+}
+
+/* Comment.Single */
+[data-theme="dark"] .highlight .cs {
+    color: #75715e
+}
+
+/* Comment.Special */
