@@ -26,6 +26,21 @@ common-js:
 <!-- Beautiful Jekyll 5.0.0 | Copyright Dean Attali 2020 -->
 {% include head.html %}
 
+<script>
+  // Prevent flash of unstyled content (FOUC) by applying theme immediately
+  (function () {
+    // Check for saved theme or system preference
+    var savedTheme = localStorage.getItem('theme');
+    var systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+
+    // Apply theme immediately to prevent flash
+    if (theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  })();
+</script>
+
 <body>
 
   {% include gtm_body.html %}
