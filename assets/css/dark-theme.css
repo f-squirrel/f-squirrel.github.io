@@ -259,16 +259,23 @@
     color: inherit;
 }
 
-/* Share buttons */
-[data-theme="dark"] .btn-social {
-    background-color: #2d2d2d;
-    border-color: #404040;
-    color: #e0e0e0;
+/* Share buttons - match the grey color scheme of other social icons */
+[data-theme="dark"] .btn-social,
+[data-theme="dark"] .btn-facebook,
+[data-theme="dark"] .btn-linkedin,
+[data-theme="dark"] .btn-twitter {
+    background-color: #666666 !important;
+    border-color: #666666 !important;
+    color: #e0e0e0 !important;
 }
 
-[data-theme="dark"] .btn-social:hover {
-    background-color: #404040;
-    border-color: #66b3ff;
+[data-theme="dark"] .btn-social:hover,
+[data-theme="dark"] .btn-facebook:hover,
+[data-theme="dark"] .btn-linkedin:hover,
+[data-theme="dark"] .btn-twitter:hover {
+    background-color: #888888 !important;
+    border-color: #888888 !important;
+    color: #ffffff !important;
 }
 
 /* Footer brand/theme-by text */
