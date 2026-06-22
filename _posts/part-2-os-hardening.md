@@ -1,6 +1,6 @@
 # Where `zeroize` stops: hardening keys at the OS level
 
-*This follows on from [I Zeroized My Secret. Or Did I?](./part-1-zeroize.md), where we found that `zeroize` reliably wipes a secret you can name — but copies still leak past it through register spills, moves, and `Vec` reallocation. Those leftover copies live in your process's memory, and the operating system is free to move that memory around. This post is about taking those moves away from it.*
+*This follows on from [I Zeroized My Secret. Or Did I?](/zeroize), where we found that `zeroize` reliably wipes a secret you can name — but copies still leak past it through register spills, moves, and `Vec` reallocation. Those leftover copies live in your process's memory, and the operating system is free to move that memory around. This post is about taking those moves away from it.*
 
 There are really three things the OS can do with a secret sitting in your RAM, and each one needs a different knob:
 
@@ -120,7 +120,7 @@ But notice what every single knob here quietly assumes: that the plaintext key i
 
 That's the last layer: HSMs, threshold signing, and enclaves — arranging for the key never to be in your process at all.
 
-← Previous: [I Zeroized My Secret. Or Did I?](./part-1-zeroize.md)
+← Previous: [I Zeroized My Secret. Or Did I?](/zeroize)
 → Next: [Don't hold the key: architecture for secrets you can't afford to lose](./part-3-architecture.md)
 
 ---
