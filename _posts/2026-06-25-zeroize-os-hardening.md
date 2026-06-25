@@ -15,11 +15,39 @@ There are really three things the OS can do with a secret sitting in your RAM, a
 2. **write it into a core dump** when you crash,
 3. **hand it to another process** that reads your live memory.
 
-Let's take them one at a time. All of these are cheap to add and worth it for high-value keys.
+Rather than touring the three controls separately, let's build a single hardened key buffer one piece at a time — adding each line only when the previous version is missing something — and then harden the process around it. By the end we'll have a small `HardenedKey` type and a one-shot `harden_process()` call.
 
-## 1. Memory can be swapped (and hibernated)
+## Starting point: just `Zeroizing`
 
-The kernel might page your secret out to the swap file, leaving a copy sitting on disk long after the process is gone. The fix is `mlock(2)`: pin the pages in RAM so they're never swapped.
+After part 1, this is where we ended up:
+
+```rust
+use zeroize::Zeroizing;
+
+let key = Zeroizing::new(load_key()); // [u8; 32] on the stack
+crypto_op(&key);
+// drops here, wiped
+```
+
+It compiles, it wipes on drop, and for low-value secrets it's enough. But every problem from part 1 is still here — moves, spills, `mem::forget` — and now the OS is allowed to make things harder on top of that: the page the stack sits on can be swapped to disk, copied into a core dump, or read by another same-user process via `ptrace`. Let's close those gaps one at a time.
+
+## Step 1: put it on the heap for a stable address
+
+The stale-copies problem from part 1 has a particularly nasty form once the OS gets involved. Every time the array moves on the stack — a function return, an assignment, an argument pass — Rust memcopies the 32 bytes into a new slot. `zeroize` only wipes the *last* one. Every other stack slot that ever held those bytes can be paged to swap or captured in a core dump, which is exactly what the next two steps are trying to prevent.
+
+The fix is the same one we'd reach for if we cared about the move hazard alone: heap-allocate, so the *pointer* moves but the *bytes* stay put.
+
+```rust
+use zeroize::Zeroizing;
+
+let key = Box::new(Zeroizing::new(load_key()));
+```
+
+Now the only stack slot that holds anything sensitive holds a pointer, and the 32 bytes live at a fixed heap address that doesn't change just because the owning variable moves around. That stable address matters for everything below: the lock from Step 2 will be pinned to it, the `madvise` from Step 3 will be applied to it, and neither would survive if the bytes themselves moved.
+
+## Step 2: pin it in RAM so it can't be swapped
+
+A heap allocation is still pageable memory. The kernel might page your secret out to the swap file, leaving a copy sitting on disk long after the process is gone. The fix is `mlock(2)`: tell the kernel "don't swap these pages out."
 
 A few mechanical details about `mlock` worth pinning down, because they change how you call it:
 
@@ -42,13 +70,14 @@ That's where the [`region`](https://docs.rs/region) crate comes in. It's worth b
 For our purposes — keeping a secret out of swap — the one we care about is `region::lock`. It picks the right primitive per OS and hands you an RAII guard so the unlock (`munlock` / `VirtualUnlock`) fires automatically when the guard drops:
 
 ```rust
-// region = "3"
-let secret = Zeroizing::new([0u8; 32]);
-let _guard = region::lock(secret.as_ptr(), secret.len())?;
-// pages stay resident until `_guard` drops, which calls munlock/VirtualUnlock
+use zeroize::Zeroizing;
+
+let key = Box::new(Zeroizing::new(load_key()));
+let _lock = region::lock(key.as_ptr(), key.len())?;
+// pages stay resident until `_lock` drops, which calls munlock/VirtualUnlock
 ```
 
-So `region::lock` and `mlock` aren't competing tools — `region::lock` *is* `mlock` on Linux, with portability and a scope-bound undo bolted on. The difference is ergonomic, not behavioural; every caveat below applies whether you went through `region` or called `mlock` yourself.
+The `Box` from Step 1 is doing real work here: the lock points at a heap address that *won't move* if `key` is later passed to another function or stored in a struct. If we'd locked a stack `[0u8; 32]` instead, then moved `key`, the lock would still be pinning the original (now stale) stack page and the live bytes would sit on an unlocked one.
 
 A note on the sibling call: `region::protect` (i.e. `mprotect`/`VirtualProtect`) is a *different* control. It changes the read/write/execute flags on a page — useful for things like marking a buffer no-access between uses, or making JIT pages executable — but it doesn't stop the kernel from paging that memory out. For "don't swap my secret," reach for `lock`; `protect` is a separate axis. (This is also why `secrecy` says it deliberately does neither — it's leaving the OS-level posture to you.)
 
@@ -60,68 +89,31 @@ A couple of honest heads-ups, because `mlock` has sharp edges:
 - **It stops swapping, not hibernation.** Suspend-to-disk snapshots *all* of RAM — locked pages included — into the hibernation image. Covering that means an encrypted hibernation image or no hibernation at all; it isn't something your process can fix on its own.
 - **Windows differs.** `VirtualLock` keeps pages in the working set, but the working-set model has its own quirks; treat the cross-platform wrapper as best-effort and test on each target.
 
-## 2. Memory can end up in a core dump
+## Step 3: keep it out of core dumps
 
-If the process crashes, the OS can write your whole address space — secrets and all — into a core file or hand it to a crash reporter. Two independent things to do here.
-
-**(a) Keep the secret's pages out of dumps** with `madvise(MADV_DONTDUMP)`. The kernel's [`core(5)`](https://man7.org/linux/man-pages/man5/core.5.html) confirms a dump will leave out any region you mark this way.
+If the process crashes, the OS can write your whole address space — secrets and all — into a core file or hand it to a crash reporter. The per-region knob for that is `madvise(MADV_DONTDUMP)`: tell the kernel that a specific memory range should be excluded from any core dump. The kernel's [`core(5)`](https://man7.org/linux/man-pages/man5/core.5.html) confirms a dump will leave out any region you mark this way.
 
 ```rust
-// os-memlock = "..."   (Linux: MADV_DONTDUMP, FreeBSD: MADV_NOCORE)
-unsafe { os_memlock::madvise_dontdump(ptr, len)?; }
+let key = Box::new(Zeroizing::new(load_key()));
+let _lock = region::lock(key.as_ptr(), key.len())?;
+unsafe {
+    os_memlock::madvise_dontdump(key.as_ptr() as *mut _, key.len())?;
+}
 ```
 
-`nix` also exposes `madvise` with `MmapAdvise::MADV_DONTDUMP`. Man page: [`madvise(2)`](https://man7.org/linux/man-pages/man2/madvise.2.html).
+(`nix` also exposes `madvise` with `MmapAdvise::MADV_DONTDUMP`. On FreeBSD the equivalent is `MADV_NOCORE`. Man page: [`madvise(2)`](https://man7.org/linux/man-pages/man2/madvise.2.html).)
 
-**(b) Turn off core dumps for the whole process.** The obvious move is `setrlimit(RLIMIT_CORE, 0)`:
+Note that this is *per-region*, not process-wide — it marks the page your key lives on, and only that page, as "don't dump." That's the right granularity here, but it's a hint attached to the allocation. Lose track of the allocation and the marker goes with it. (Disabling dumps for the whole process is a separate, blunter step — we'll get to it in Step 5.)
 
-```rust
-// rlimit = "0.10"
-use rlimit::{setrlimit, Resource};
-setrlimit(Resource::CORE, 0, 0)?;   // soft = hard = 0
-```
+## Step 4: bundle it into a `HardenedKey` type
 
-Here's the gotcha that's genuinely worth knowing: `core(5)` says **`RLIMIT_CORE` gets ignored when dumps are piped to a program** — which is exactly what `systemd-coredump` does on most modern Linux boxes. So `RLIMIT_CORE = 0` on its own can still quietly ship your crash to the journal. The fix is to also call `prctl(PR_SET_DUMPABLE, 0)`:
+We've now got three things that have to live and die together: the bytes, the lock guard, and the `MADV_DONTDUMP` advice. If the lock guard drops before the bytes, the page becomes swappable while the secret is still in it. If the bytes are freed without us knowing, the lock and the advice point at memory we no longer own. Holding all three correctly across every early return and `?` is the kind of thing that's easy to get wrong by hand.
 
-```rust
-// prctl = "1"
-let _ = prctl::set_dumpable(false);   // also quiets systemd-coredump
-```
-
-Man page: [`prctl(2)`](https://man7.org/linux/man-pages/man2/prctl.2.html).
-
-## 3. Another process can read your live memory
-
-This is the threat the first post admitted `zeroize` can't touch: an attacker who reads your memory *while the process is running*. On Linux the usual route is `ptrace` (or reading `/proc/<pid>/mem`), and a process running as the same user can do it by default. In a world of compromised dependencies and shared hosts, that's not exotic.
-
-Good news: `prctl(PR_SET_DUMPABLE, 0)` from the last section pulls double duty. Marking the process non-dumpable also makes it **non-attachable by `ptrace` for anyone who isn't root** — so the single call that quiets core dumps also slams the easy door on live-memory snooping.
-
-For a system-wide policy there's the Yama LSM, via `/proc/sys/kernel/yama/ptrace_scope`:
-
-- `0` — classic behaviour: any same-user process can attach.
-- `1` — restricted (the common default): only a parent, or a tracer the target explicitly allows via `prctl(PR_SET_PTRACER, ...)`.
-- `2` — admin-only (needs `CAP_SYS_PTRACE`).
-- `3` — no attaching at all, for anyone, until reboot.
-
-The honest caveat, same as always: none of this stops a root / `CAP_SYS_PTRACE` attacker, who can lift any of these. What it does is raise the bar a lot against the realistic same-user case — and that's most of the value.
-
-## Putting it in one buffer
-
-These knobs are most useful stacked. Here's a sketch of a 32-byte key that is wiped on drop, pinned in RAM, and excluded from dumps — plus a one-time process-hardening call you'd run at startup:
+The Rust answer is "make them one type and let RAII enforce the ordering."
 
 ```rust
 use zeroize::Zeroizing;
 
-/// Run once, early, before any secrets are loaded.
-fn harden_process() {
-    let _ = rlimit::setrlimit(rlimit::Resource::CORE, 0, 0); // no core dumps
-    let _ = prctl::set_dumpable(false);                      // + quiet systemd, + block ptrace
-}
-
-/// A secret that is zeroized on drop, mlock'd (no swap), and MADV_DONTDUMP'd.
-/// Boxed so its address is *stable*: remember from part 1 that moving the
-/// owner would otherwise memcpy the bytes and leave the lock pointing at a
-/// stale (unwiped!) location.
 struct HardenedKey {
     bytes: Box<Zeroizing<[u8; 32]>>,
     _lock: region::LockGuard,
@@ -132,18 +124,74 @@ impl HardenedKey {
         let mut bytes = Box::new(Zeroizing::new([0u8; 32]));
         init(&mut bytes);
         let (ptr, len) = (bytes.as_ptr(), bytes.len());
-        let lock = region::lock(ptr, len)?;                          // pin: no swap
+        let lock = region::lock(ptr, len)?;                           // pin: no swap
         unsafe { os_memlock::madvise_dontdump(ptr as *mut _, len)?; } // exclude from dumps
         Ok(Self { bytes, _lock: lock })
     }
 }
 ```
 
-(Types and crate versions are simplified — check the exact `region::LockGuard` name and signatures against the versions you pin.) Notice that the move hazard from part 1 reappears here at the OS layer: the boxed buffer is the fix, because the *heap* allocation stays put even when the struct that owns it moves.
+What this earns us:
+
+- **Field-order drop semantics.** Rust drops a struct's fields in declaration order. By putting `bytes` first and `_lock` second, the `Zeroizing` wipe runs *while* the page is still locked — so the wipe lands on resident memory, not on memory the kernel just paged out under our feet. (Reversing the field order would be a quiet bug.)
+- **You can't accidentally leak one of the three.** Bytes, lock, and dump-exclusion are wired together — there's no path where one outlives the others or gets forgotten on an early return.
+- **The move hazard from part 1 is genuinely gone.** Moving a `HardenedKey` moves the `Box` pointer and the `LockGuard` handle, not the 32 bytes; the heap allocation stays put, and the lock keeps pointing at the same page.
+
+(Types and crate versions are simplified — check the exact `region::LockGuard` name and signatures against the versions you pin.)
+
+## Step 5: harden the process around it
+
+Everything above is per-key. There's a second category of fixes that don't belong on the buffer at all — they apply once, at process startup, and cover the gaps a per-page approach can't.
+
+**Turn off core dumps for the whole process.** `MADV_DONTDUMP` is a hint on a specific region; a dump path can still capture *other* regions that happened to hold a copy (a spill, a stale stack slot, a `Vec` that grew and reallocated). The blunt instrument is `setrlimit(RLIMIT_CORE, 0)`:
+
+```rust
+use rlimit::{setrlimit, Resource};
+setrlimit(Resource::CORE, 0, 0)?;   // soft = hard = 0
+```
+
+Here's the gotcha that's genuinely worth knowing: `core(5)` says **`RLIMIT_CORE` gets ignored when dumps are piped to a program** — which is exactly what `systemd-coredump` does on most modern Linux boxes. So `RLIMIT_CORE = 0` on its own can still quietly ship your crash to the journal. The fix is to also call `prctl(PR_SET_DUMPABLE, 0)`:
+
+```rust
+let _ = prctl::set_dumpable(false);   // also quiets systemd-coredump
+```
+
+Man page: [`prctl(2)`](https://man7.org/linux/man-pages/man2/prctl.2.html).
+
+**Block live-memory snooping.** This is the threat the first post admitted `zeroize` can't touch: an attacker who reads your memory *while the process is running*. On Linux the usual route is `ptrace` (or reading `/proc/<pid>/mem`), and a process running as the same user can do it by default. In a world of compromised dependencies and shared hosts, that's not exotic.
+
+Good news: the `prctl(PR_SET_DUMPABLE, 0)` call above pulls double duty. Marking the process non-dumpable also makes it **non-attachable by `ptrace` for anyone who isn't root** — the same single call that quiets core dumps also slams the easy door on live-memory snooping.
+
+Wrap both in one startup helper, called *before* any secrets are loaded:
+
+```rust
+fn harden_process() {
+    let _ = rlimit::setrlimit(rlimit::Resource::CORE, 0, 0); // no core dumps
+    let _ = prctl::set_dumpable(false);                      // + quiet systemd, + block ptrace
+}
+
+fn main() -> std::io::Result<()> {
+    harden_process();                            // once, at startup
+    let key = HardenedKey::load(load_key_from_kms)?;
+    crypto_op(&key.bytes);
+    Ok(())
+}
+```
+
+For a system-wide policy there's the Yama LSM, via `/proc/sys/kernel/yama/ptrace_scope`:
+
+- `0` — classic behaviour: any same-user process can attach.
+- `1` — restricted (the common default): only a parent, or a tracer the target explicitly allows via `prctl(PR_SET_PTRACER, ...)`.
+- `2` — admin-only (needs `CAP_SYS_PTRACE`).
+- `3` — no attaching at all, for anyone, until reboot.
+
+The honest caveat, same as always: none of this stops a root / `CAP_SYS_PTRACE` attacker, who can lift any of these. What it does is raise the bar a lot against the realistic same-user case — and that's most of the value.
 
 ## Where this leaves us
 
-Stacked up, these controls meaningfully shrink the window in which your secret is recoverable: off the swap file, out of crash dumps, and away from same-user snooping. That's a real improvement, and for a lot of keys it's enough.
+Each step in this post answered a specific "what's still wrong?" left over by the previous one: stale stack copies → `Box`, swappable pages → `mlock`, crash dumps → `MADV_DONTDUMP`, lifetime juggling → bundle it in a type, and finally the process-level gaps a per-buffer fix can't reach → `setrlimit` + `prctl` + Yama.
+
+Stacked up, these meaningfully shrink the window in which your secret is recoverable: off the swap file, out of crash dumps, and away from same-user snooping. That's a real improvement, and for a lot of keys it's enough.
 
 But notice what every single knob here quietly assumes: that the plaintext key is sitting in *your* process's RAM in the first place. Each control is damage limitation around that fact. The strongest move isn't a better knob — it's making the assumption false, so there's nothing in your address space to protect.
 
