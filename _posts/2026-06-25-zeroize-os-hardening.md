@@ -290,9 +290,11 @@ That's the last layer: HSMs, threshold signing, and enclaves — arranging for t
 
 *Further reading:*
 
-- `region` (mlock) — https://docs.rs/region
+- `region` (cross-platform virtual memory: `alloc`, `lock`, `protect`, `query`) — https://docs.rs/region
 - `os-memlock` (mlock + MADV_DONTDUMP) — https://docs.rs/os-memlock
 - `rlimit` — https://docs.rs/rlimit · `prctl` — https://docs.rs/prctl
 - `core(5)` — https://man7.org/linux/man-pages/man5/core.5.html
-- `mlock(2)` — https://man7.org/linux/man-pages/man2/mlock.2.html · `madvise(2)` — https://man7.org/linux/man-pages/man2/madvise.2.html · `prctl(2)` — https://man7.org/linux/man-pages/man2/prctl.2.html
+- `mlock(2)` — https://man7.org/linux/man-pages/man2/mlock.2.html · `madvise(2)` — https://man7.org/linux/man-pages/man2/madvise.2.html · `mprotect(2)` — https://man7.org/linux/man-pages/man2/mprotect.2.html · `prctl(2)` — https://man7.org/linux/man-pages/man2/prctl.2.html
 - Yama / `ptrace_scope` — https://docs.kernel.org/admin-guide/LSM/Yama.html · `ptrace(2)` — https://man7.org/linux/man-pages/man2/ptrace.2.html
+- libsodium guarded heap allocation (the production-grade version of Step 6, with guard pages and a canary) — https://doc.libsodium.org/memory_management · source: [`src/libsodium/sodium/utils.c`](https://github.com/jedisct1/libsodium/blob/master/src/libsodium/sodium/utils.c) (`sodium_malloc` / `sodium_mprotect_noaccess` / `sodium_mprotect_readonly` / `sodium_mprotect_readwrite`)
+- `memsec` — a Rust port of libsodium's secure-allocation primitives — https://docs.rs/memsec
