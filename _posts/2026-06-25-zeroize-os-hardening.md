@@ -315,7 +315,16 @@ A few honest things to note about this layer:
 - **It doesn't help with the threats Steps 1–5 already covered.** Swap, core dumps, and `ptrace` all bypass page protections — the bytes-on-disk and bytes-via-tracer paths read the underlying memory regardless of `PROT_*` flags. The `region::lock` and `madvise_dontdump` calls inside `load` are still the load-bearing controls there; the `protect` toggle is *added* on top, not a replacement.
 - **`harden_process()` from Step 5 still applies unchanged.** Per-key and process-level controls compose freely.
 
-The pattern itself isn't novel — libsodium and a handful of Rust crates do exactly this. The reason it's tucked behind *"going further"* rather than the recommended baseline is the threat-model shift: it's a tool for a different problem than the rest of this post.
+The pattern itself isn't novel, and **if you're reaching for this in production, don't roll your own — use [`secrets`](https://crates.io/crates/secrets)**. It's the same bracket (`PROT_NONE` at rest, `PROT_READ`/`PROT_WRITE` on borrow), but ergonomic (`SecretBox<T>` / `SecretVec<T>`), backed by libsodium's audited primitives, with guard pages and canaries that the hand-rolled version here doesn't have. The `PageProtectedKey` above is here to *show* the pattern, not to compete with it.
+
+A couple of other crates worth knowing about in the same neighbourhood:
+
+- **[`memsec`](https://docs.rs/memsec)** — pure-Rust port of libsodium's `utils.c`, lower-level (free functions, no borrow-API). On Linux ≥ 5.14 it also exposes `memfd_secret(2)`, which is *strictly stronger* than `mlock`+`mprotect`: the kernel itself can no longer map the page, so even `/proc/<pid>/mem` and most kernel-side reads can't reach it. That's the natural sequel to this step.
+- **[`secmem-alloc`](https://crates.io/crates/secmem-alloc)** — different shape: a custom allocator you plug into `Box::new_in` / `Vec::new_in` so every allocation in a secret-bearing region gets `mlock` + zeroize-on-dealloc by default. No `mprotect` bracket, but a much lower per-key cost than a dedicated page.
+
+And then the one *not* to reach for here: **[`secrecy`](https://docs.rs/secrecy)** is explicitly *only* zeroize + a `Debug`-redacted `ExposeSecret` wrapper — no `mlock`, no `mprotect`, no `MADV_DONTDUMP`. It's a good ergonomic top-layer over any of the above, but it doesn't replace them.
+
+The reason all of this is tucked behind *"going further"* rather than the recommended baseline is the threat-model shift: it's a tool for a different problem than the rest of this post.
 
 A working version of both `HardenedKey` and `PageProtectedKey` (with the real `unsafe { ... }` blocks the `region` crate's `protect` API actually requires, and pinned crate versions) is in [`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening). `cargo run --release` should print two matching checksums.
 
@@ -339,4 +348,8 @@ But every knob here quietly assumes the plaintext key is sitting in *your* proce
 - `mlock(2)` — https://man7.org/linux/man-pages/man2/mlock.2.html · `madvise(2)` — https://man7.org/linux/man-pages/man2/madvise.2.html · `mprotect(2)` — https://man7.org/linux/man-pages/man2/mprotect.2.html · `prctl(2)` — https://man7.org/linux/man-pages/man2/prctl.2.html
 - Yama / `ptrace_scope` — https://docs.kernel.org/admin-guide/LSM/Yama.html · `ptrace(2)` — https://man7.org/linux/man-pages/man2/ptrace.2.html
 - libsodium guarded heap allocation (the production-grade version of Step 6, with guard pages and a canary) — https://doc.libsodium.org/memory_management · source: [`src/libsodium/sodium/utils.c`](https://github.com/jedisct1/libsodium/blob/master/src/libsodium/sodium/utils.c) (`sodium_malloc` / `sodium_mprotect_noaccess` / `sodium_mprotect_readonly` / `sodium_mprotect_readwrite`)
-- `memsec` — a Rust port of libsodium's secure-allocation primitives — https://docs.rs/memsec
+- `secrets` — ergonomic Rust wrapper over libsodium's guarded allocation (`SecretBox` / `SecretVec`, the recommended way to use the Step 6 pattern in production) — https://crates.io/crates/secrets
+- `memsec` — a Rust port of libsodium's secure-allocation primitives; on Linux ≥ 5.14 also exposes `memfd_secret` — https://docs.rs/memsec
+- `secmem-alloc` — secret-memory custom allocator for `Box::new_in` / `Vec::new_in` — https://crates.io/crates/secmem-alloc
+- `secrecy` — ergonomic `Secret<T>` / `ExposeSecret` (zeroize + `Debug` redaction *only* — no mlock/mprotect/MADV) — https://docs.rs/secrecy
+- `memfd_secret(2)` — Linux ≥ 5.14, kernel-level secret memory beyond what `mlock`/`mprotect` reach — https://man7.org/linux/man-pages/man2/memfd_secret.2.html
