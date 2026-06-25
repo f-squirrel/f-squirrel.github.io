@@ -185,7 +185,7 @@ fn harden_process() {
 fn main() -> std::io::Result<()> {
     harden_process();                            // once, at startup
     let key = HardenedKey::load(load_key_from_kms)?;
-    crypto_op(&key.bytes);
+    crypto_op(key.as_bytes());
     Ok(())
 }
 ```
@@ -206,6 +206,7 @@ Every step above has been about *external* threats — the OS paging memory out,
 The catch is that `mprotect` works at page granularity, and the heap `Box` from earlier shares its page with allocator metadata and neighbouring allocations — flipping the whole page to `PROT_NONE` would crash anything that touched a neighbour. To use `protect` safely you need a *dedicated* page. That's what `region::alloc` (the `mmap`/`VirtualAlloc` row of the table back in Step 2) is for. Once you own a whole page, `region::lock`, `MADV_DONTDUMP`, *and* `region::protect` can all be applied to it cleanly:
 
 ```rust
+use std::ffi::c_void;
 use region::Protection;
 use zeroize::Zeroize;
 
@@ -223,31 +224,44 @@ impl PageProtectedKey {
     fn load(init: impl FnOnce(&mut [u8])) -> std::io::Result<Self> {
         // 1. Whole page, initially writable so we can fill it.
         let mut alloc = region::alloc(KEY_LEN, Protection::READ_WRITE)?;
-        let (ptr, len) = (alloc.as_ptr(), alloc.len()); // len is page-rounded
+        let ptr: *const u8 = alloc.as_ptr::<u8>();
+        let len: usize = alloc.len(); // page-rounded (typically 4096)
 
         // 2. Pin and exclude-from-dumps — same as Steps 2 and 3, just on a
         //    whole page instead of a corner of one.
         let _lock = region::lock(ptr, len)?;
-        unsafe { os_memlock::madvise_dontdump(ptr as *mut _, len)?; }
+        // SAFETY: ptr/len describe a live, owned, page-aligned mmap region.
+        unsafe { os_memlock::madvise_dontdump(ptr as *mut c_void, len)?; }
 
         // 3. Write the secret in through the only window we'll allow.
-        let bytes = unsafe {
-            std::slice::from_raw_parts_mut(alloc.as_mut_ptr(), KEY_LEN)
-        };
-        init(bytes);
+        // SAFETY: alloc is page-rounded and at least KEY_LEN bytes.
+        {
+            let bytes = unsafe {
+                std::slice::from_raw_parts_mut(alloc.as_mut_ptr::<u8>(), KEY_LEN)
+            };
+            init(bytes);
+        }
 
         // 4. Seal: no access at all until something deliberately opens it.
-        region::protect(ptr, len, Protection::NONE)?;
+        // SAFETY: same live mapping; the writable slice above has gone out of
+        // scope, so flipping to PROT_NONE doesn't dangle any reference.
+        unsafe { region::protect(ptr, len, Protection::NONE)?; }
         Ok(Self { _lock, alloc })
     }
 
     /// Briefly flip to read-only, hand the bytes to `f`, then re-seal.
     fn with_readable<R>(&self, f: impl FnOnce(&[u8]) -> R) -> std::io::Result<R> {
-        let _open = region::protect_with_handle(
-            self.alloc.as_ptr(), self.alloc.len(), Protection::READ,
-        )?; // dropped at end of scope → restores PROT_NONE
+        // SAFETY: same live mapping; the returned guard restores PROT_NONE on drop.
+        let _open = unsafe {
+            region::protect_with_handle(
+                self.alloc.as_ptr::<u8>(),
+                self.alloc.len(),
+                Protection::READ,
+            )?
+        };
+        // SAFETY: page is now PROT_READ for the duration of `_open`.
         let bytes = unsafe {
-            std::slice::from_raw_parts(self.alloc.as_ptr(), KEY_LEN)
+            std::slice::from_raw_parts(self.alloc.as_ptr::<u8>(), KEY_LEN)
         };
         Ok(f(bytes))
     }
@@ -257,13 +271,18 @@ impl Drop for PageProtectedKey {
     fn drop(&mut self) {
         // Re-open for writing so the wipe can land, then let _lock unlock and
         // alloc unmap. (Custom Drop runs *before* the fields drop.)
-        let _ = region::protect(
-            self.alloc.as_ptr(), self.alloc.len(), Protection::READ_WRITE,
-        );
-        let bytes = unsafe {
-            std::slice::from_raw_parts_mut(self.alloc.as_mut_ptr(), KEY_LEN)
-        };
-        bytes.zeroize();
+        // SAFETY: same live mapping; we're about to write KEY_LEN bytes.
+        unsafe {
+            let _ = region::protect(
+                self.alloc.as_ptr::<u8>(),
+                self.alloc.len(),
+                Protection::READ_WRITE,
+            );
+            let bytes = std::slice::from_raw_parts_mut(
+                self.alloc.as_mut_ptr::<u8>(), KEY_LEN,
+            );
+            bytes.zeroize();
+        }
     }
 }
 ```

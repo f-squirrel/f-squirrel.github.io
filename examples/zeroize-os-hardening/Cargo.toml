@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 zeroize = { version = "1", features = ["derive"] }
 region = "3"
-nix = { version = "0.29", features = ["mman"] }
+os-memlock = "0.2"
 
 [target.'cfg(unix)'.dependencies]
 rlimit = "0.10"
