@@ -30,7 +30,16 @@ A few mechanical details about `mlock` worth pinning down, because they change h
 
 `mlock` is a raw libc call. You *can* reach it from Rust via `libc::mlock` directly, but it's `unsafe`, platform-specific, and you have to remember the `munlock` yourself.
 
-That's what the [`region`](https://docs.rs/region) crate is for. It isn't an alternative to `mlock` — it's a thin cross-platform Rust wrapper around it. `region::lock` picks the right primitive per OS (`mlock` on Unix, `VirtualLock` on Windows) and hands you an RAII guard so the unlock fires automatically when the guard drops:
+That's where the [`region`](https://docs.rs/region) crate comes in. It's worth being precise about what it actually is, because its [own docs](https://docs.rs/region/) describe it as a *cross-platform virtual memory API*, not an `mlock` library. It wraps a whole family of platform primitives:
+
+| `region` API | Unix | Windows | What it does |
+|---|---|---|---|
+| `region::query` | `/proc/self/maps` | `VirtualQuery` | inspect a memory region |
+| `region::alloc` | `mmap` | `VirtualAlloc` | reserve/commit pages |
+| `region::protect` | `mprotect` | `VirtualProtect` | change R/W/X permissions |
+| `region::lock` | `mlock` | `VirtualLock` | pin pages so they can't be swapped |
+
+For our purposes — keeping a secret out of swap — the one we care about is `region::lock`. It picks the right primitive per OS and hands you an RAII guard so the unlock (`munlock` / `VirtualUnlock`) fires automatically when the guard drops:
 
 ```rust
 // region = "3"
@@ -39,7 +48,9 @@ let _guard = region::lock(secret.as_ptr(), secret.len())?;
 // pages stay resident until `_guard` drops, which calls munlock/VirtualUnlock
 ```
 
-So `region` and `mlock` very much work together: `region::lock` *is* `mlock` on Linux, with portability and a scope-bound undo bolted on. The difference is ergonomic, not behavioural — every caveat below applies whether you went through `region` or called `mlock` yourself.
+So `region::lock` and `mlock` aren't competing tools — `region::lock` *is* `mlock` on Linux, with portability and a scope-bound undo bolted on. The difference is ergonomic, not behavioural; every caveat below applies whether you went through `region` or called `mlock` yourself.
+
+A note on the sibling call: `region::protect` (i.e. `mprotect`/`VirtualProtect`) is a *different* control. It changes the read/write/execute flags on a page — useful for things like marking a buffer no-access between uses, or making JIT pages executable — but it doesn't stop the kernel from paging that memory out. For "don't swap my secret," reach for `lock`; `protect` is a separate axis. (This is also why `secrecy` says it deliberately does neither — it's leaving the OS-level posture to you.)
 
 If you'd rather go lower-level, [`nix`](https://docs.rs/nix) gives you `nix::sys::mman::mlock`, and [`os-memlock`](https://docs.rs/os-memlock) offers thin `mlock`/`munlock` wrappers. Man page: [`mlock(2)`](https://man7.org/linux/man-pages/man2/mlock.2.html).
 
