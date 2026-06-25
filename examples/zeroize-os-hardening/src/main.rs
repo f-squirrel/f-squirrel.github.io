@@ -18,13 +18,12 @@
 //!
 //! Run:  cargo run --release
 //!
-//! Linux-only because of nix's `MADV_DONTDUMP` and the prctl/rlimit calls.
+//! Linux/FreeBSD: full MADV_DONTDUMP path. Other Unixes: os-memlock returns
+//! Unsupported and we treat it as best-effort. Linux is the well-trodden case.
 
 use std::ffi::c_void;
 use std::io;
-use std::ptr::NonNull;
 
-use nix::sys::mman::{madvise, MmapAdvise};
 use region::Protection;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -108,10 +107,9 @@ impl PageProtectedKey {
 
         // Step 6.2 — Pin the whole page in RAM, exclude it from dumps.
         let lock = region::lock(ptr, len).map_err(io_err)?;
-        // SAFETY: `ptr`/`len` describe a live, owned mmap region.
+        // SAFETY: `ptr`/`len` describe a live, owned, page-aligned mmap region.
         unsafe {
-            let nn = NonNull::new(ptr as *mut c_void).expect("non-null mmap ptr");
-            madvise(nn, len, MmapAdvise::MADV_DONTDUMP).map_err(io_err)?;
+            os_memlock::madvise_dontdump(ptr as *mut c_void, len)?;
         }
 
         // Step 6.3 — Fill in the secret through the only window we'll allow.
