@@ -1,0 +1,13 @@
+[package]
+name = "zeroize-os-hardening"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+zeroize = { version = "1", features = ["derive"] }
+region = "3"
+nix = { version = "0.29", features = ["mman"] }
+
+[target.'cfg(unix)'.dependencies]
+rlimit = "0.10"
+prctl = "1"
