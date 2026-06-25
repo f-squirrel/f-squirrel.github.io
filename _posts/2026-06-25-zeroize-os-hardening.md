@@ -187,9 +187,95 @@ For a system-wide policy there's the Yama LSM, via `/proc/sys/kernel/yama/ptrace
 
 The honest caveat, same as always: none of this stops a root / `CAP_SYS_PTRACE` attacker, who can lift any of these. What it does is raise the bar a lot against the realistic same-user case — and that's most of the value.
 
+## Step 6 (going further): a page-isolated variant
+
+Every step above has been about *external* threats — the OS paging memory out, the kernel dumping it on a crash, another process attaching. There's one more category worth knowing about: a stray pointer, out-of-bounds read, or use-after-free *in your own code* that accidentally reads the secret's bytes. The control for that is `mprotect(PROT_NONE)`: deny every access to the page when the key isn't actively in use, so any stray touch SIGSEGVs instead of silently picking up the bytes.
+
+The catch is that `mprotect` works at page granularity, and the heap `Box` from earlier shares its page with allocator metadata and neighbouring allocations — flipping the whole page to `PROT_NONE` would crash anything that touched a neighbour. To use `protect` safely you need a *dedicated* page. That's what `region::alloc` (the `mmap`/`VirtualAlloc` row of the table back in Step 2) is for. Once you own a whole page, `region::lock`, `MADV_DONTDUMP`, *and* `region::protect` can all be applied to it cleanly:
+
+```rust
+use region::Protection;
+use zeroize::Zeroize;
+
+const KEY_LEN: usize = 32;
+
+struct PageProtectedKey {
+    // Field order matters: _lock must drop *after* the wipe in our Drop impl,
+    // and *before* `alloc` is unmapped. Custom Drop runs first; then fields
+    // drop in declaration order, so list _lock before alloc.
+    _lock: region::LockGuard,
+    alloc: region::Allocation, // dedicated, page-aligned; PROT_NONE at rest
+}
+
+impl PageProtectedKey {
+    fn load(init: impl FnOnce(&mut [u8])) -> std::io::Result<Self> {
+        // 1. Whole page, initially writable so we can fill it.
+        let mut alloc = region::alloc(KEY_LEN, Protection::READ_WRITE)?;
+        let (ptr, len) = (alloc.as_ptr(), alloc.len()); // len is page-rounded
+
+        // 2. Pin and exclude-from-dumps — same as Steps 2 and 3, just on a
+        //    whole page instead of a corner of one.
+        let _lock = region::lock(ptr, len)?;
+        unsafe { os_memlock::madvise_dontdump(ptr as *mut _, len)?; }
+
+        // 3. Write the secret in through the only window we'll allow.
+        let bytes = unsafe {
+            std::slice::from_raw_parts_mut(alloc.as_mut_ptr(), KEY_LEN)
+        };
+        init(bytes);
+
+        // 4. Seal: no access at all until something deliberately opens it.
+        region::protect(ptr, len, Protection::NONE)?;
+        Ok(Self { _lock, alloc })
+    }
+
+    /// Briefly flip to read-only, hand the bytes to `f`, then re-seal.
+    fn with_readable<R>(&self, f: impl FnOnce(&[u8]) -> R) -> std::io::Result<R> {
+        let _open = region::protect_with_handle(
+            self.alloc.as_ptr(), self.alloc.len(), Protection::READ,
+        )?; // dropped at end of scope → restores PROT_NONE
+        let bytes = unsafe {
+            std::slice::from_raw_parts(self.alloc.as_ptr(), KEY_LEN)
+        };
+        Ok(f(bytes))
+    }
+}
+
+impl Drop for PageProtectedKey {
+    fn drop(&mut self) {
+        // Re-open for writing so the wipe can land, then let _lock unlock and
+        // alloc unmap. (Custom Drop runs *before* the fields drop.)
+        let _ = region::protect(
+            self.alloc.as_ptr(), self.alloc.len(), Protection::READ_WRITE,
+        );
+        let bytes = unsafe {
+            std::slice::from_raw_parts_mut(self.alloc.as_mut_ptr(), KEY_LEN)
+        };
+        bytes.zeroize();
+    }
+}
+```
+
+Usage follows the same bracket pattern libsodium uses with `sodium_mprotect_noaccess` / `sodium_mprotect_readonly`:
+
+```rust
+let key = PageProtectedKey::load(|buf| load_key_into(buf))?;
+let sig = key.with_readable(|bytes| sign(bytes, &digest))?;
+// page is PROT_NONE again until the next call.
+```
+
+A few honest things to note about this layer:
+
+- **It defends against bugs, not against a determined attacker.** The page is readable *exactly* when you're using the key — which is also when a deliberate attacker would catch you. The win is against *accidents*: stray pointers, OOB reads, an errant log statement.
+- **You pay a whole page per key.** `region::alloc(32, ...)` rounds up to the system page size (typically 4 KiB). Fine for a handful of long-lived keys; very much not for thousands of short-lived ones.
+- **It doesn't help with the threats Steps 1–5 already covered.** Swap, core dumps, and `ptrace` all bypass page protections — the bytes-on-disk and bytes-via-tracer paths read the underlying memory regardless of `PROT_*` flags. The `region::lock` and `madvise_dontdump` calls inside `load` are still the load-bearing controls there; the `protect` toggle is *added* on top, not a replacement.
+- **`harden_process()` from Step 5 still applies unchanged.** Per-key and process-level controls compose freely.
+
+The pattern itself isn't novel — libsodium and a handful of Rust crates do exactly this. The reason it's tucked behind *"going further"* rather than the recommended baseline is the threat-model shift: it's a tool for a different problem than the rest of this post.
+
 ## Where this leaves us
 
-Each step in this post answered a specific "what's still wrong?" left over by the previous one: stale stack copies → `Box`, swappable pages → `mlock`, crash dumps → `MADV_DONTDUMP`, lifetime juggling → bundle it in a type, and finally the process-level gaps a per-buffer fix can't reach → `setrlimit` + `prctl` + Yama.
+Each step in this post answered a specific "what's still wrong?" left over by the previous one: stale stack copies → `Box`, swappable pages → `mlock`, crash dumps → `MADV_DONTDUMP`, lifetime juggling → bundle it in a type, the process-level gaps a per-buffer fix can't reach → `setrlimit` + `prctl` + Yama, and finally — if you also care about your own bugs touching the secret — a dedicated page with `region::alloc` + `mprotect`.
 
 Stacked up, these meaningfully shrink the window in which your secret is recoverable: off the swap file, out of crash dumps, and away from same-user snooping. That's a real improvement, and for a lot of keys it's enough.
 
