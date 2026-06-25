@@ -1,4 +1,11 @@
-# Where `zeroize` stops: hardening keys at the OS level
+---
+title: "Where `zeroize` stops: hardening keys at the OS level"
+published: true
+permalink: "/zeroize-os-hardening"
+tags: [rust, security, cryptography, zeroize, linux]
+readtime: true
+comments: false
+---
 
 *This follows on from [I Zeroized My Secret. Or Did I?](/zeroize), where we found that `zeroize` reliably wipes a secret you can name — but copies still leak past it through register spills, moves, and `Vec` reallocation. Those leftover copies live in your process's memory, and the operating system is free to move that memory around. This post is about taking those moves away from it.*
 
@@ -121,7 +128,7 @@ But notice what every single knob here quietly assumes: that the plaintext key i
 That's the last layer: HSMs, threshold signing, and enclaves — arranging for the key never to be in your process at all.
 
 ← Previous: [I Zeroized My Secret. Or Did I?](/zeroize)
-→ Next: [Don't hold the key: architecture for secrets you can't afford to lose](./part-3-architecture.md)
+<!-- → Next: [Don't hold the key: architecture for secrets you can't afford to lose](./part-3-architecture.md) -->
 
 ---
 
