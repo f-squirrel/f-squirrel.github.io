@@ -21,14 +21,25 @@ Let's take them one at a time. All of these are cheap to add and worth it for hi
 
 The kernel might page your secret out to the swap file, leaving a copy sitting on disk long after the process is gone. The fix is `mlock(2)`: pin the pages in RAM so they're never swapped.
 
-The friendliest way to do this in Rust is the cross-platform [`region`](https://docs.rs/region) crate (it maps to `VirtualLock` on Windows and `mlock` on Unix):
+A few mechanical details about `mlock` worth pinning down, because they change how you call it:
+
+- **It operates on whole pages.** `mlock(addr, len)` takes a byte range, but the kernel rounds it out to every page that range touches — typically 4 KiB each. You can't pin just 32 bytes; the kernel pins the page those 32 bytes live on, and if your secret straddles a page boundary, both pages get locked.
+- **There's a budget.** Locked memory counts against `RLIMIT_MEMLOCK` (`ulimit -l`). Exceed it and you get `ENOMEM` — the call doesn't half-succeed, but it also doesn't yell at you unless you check the return value.
+- **The undo is `munlock`.** Same signature, symmetric. Forget it and the pages stay locked for the lifetime of the process.
+- **Windows has a different name for the same idea.** `VirtualLock` keeps the region in the process's working set; `VirtualUnlock` releases it.
+
+`mlock` is a raw libc call. You *can* reach it from Rust via `libc::mlock` directly, but it's `unsafe`, platform-specific, and you have to remember the `munlock` yourself.
+
+That's what the [`region`](https://docs.rs/region) crate is for. It isn't an alternative to `mlock` — it's a thin cross-platform Rust wrapper around it. `region::lock` picks the right primitive per OS (`mlock` on Unix, `VirtualLock` on Windows) and hands you an RAII guard so the unlock fires automatically when the guard drops:
 
 ```rust
 // region = "3"
 let secret = Zeroizing::new([0u8; 32]);
 let _guard = region::lock(secret.as_ptr(), secret.len())?;
-// pages stay resident until `_guard` drops
+// pages stay resident until `_guard` drops, which calls munlock/VirtualUnlock
 ```
+
+So `region` and `mlock` very much work together: `region::lock` *is* `mlock` on Linux, with portability and a scope-bound undo bolted on. The difference is ergonomic, not behavioural — every caveat below applies whether you went through `region` or called `mlock` yourself.
 
 If you'd rather go lower-level, [`nix`](https://docs.rs/nix) gives you `nix::sys::mman::mlock`, and [`os-memlock`](https://docs.rs/os-memlock) offers thin `mlock`/`munlock` wrappers. Man page: [`mlock(2)`](https://man7.org/linux/man-pages/man2/mlock.2.html).
 
