@@ -275,13 +275,9 @@ The pattern itself isn't novel — libsodium and a handful of Rust crates do exa
 
 ## Where this leaves us
 
-Each step in this post answered a specific "what's still wrong?" left over by the previous one: stale stack copies → `Box`, swappable pages → `mlock`, crash dumps → `MADV_DONTDUMP`, lifetime juggling → bundle it in a type, the process-level gaps a per-buffer fix can't reach → `setrlimit` + `prctl` + Yama, and finally — if you also care about your own bugs touching the secret — a dedicated page with `region::alloc` + `mprotect`.
+Stacked up, these controls shrink the window in which your secret is recoverable: off the swap file, out of crash dumps, away from same-user snooping, and — at the cost of a page per key — out of reach of accidental in-process reads. For a lot of keys that's enough.
 
-Stacked up, these meaningfully shrink the window in which your secret is recoverable: off the swap file, out of crash dumps, and away from same-user snooping. That's a real improvement, and for a lot of keys it's enough.
-
-But notice what every single knob here quietly assumes: that the plaintext key is sitting in *your* process's RAM in the first place. Each control is damage limitation around that fact. The strongest move isn't a better knob — it's making the assumption false, so there's nothing in your address space to protect.
-
-That's the last layer: HSMs, threshold signing, and enclaves — arranging for the key never to be in your process at all.
+But every knob here quietly assumes the plaintext key is sitting in *your* process's RAM. The next layer makes that assumption false: HSMs, threshold signing, and enclaves arrange for the key never to be in your process at all.
 
 ← Previous: [I Zeroized My Secret. Or Did I?](/zeroize)
 <!-- → Next: [Don't hold the key: architecture for secrets you can't afford to lose](./part-3-architecture.md) -->
