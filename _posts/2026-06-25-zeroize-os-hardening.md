@@ -93,21 +93,32 @@ A couple of honest heads-ups, because `mlock` has sharp edges:
 
 If the process crashes, the OS can write your whole address space — secrets and all — into a core file or hand it to a crash reporter. The per-region knob for that is `madvise(MADV_DONTDUMP)`: tell the kernel that a specific memory range should be excluded from any core dump. The kernel's [`core(5)`](https://man7.org/linux/man-pages/man5/core.5.html) confirms a dump will leave out any region you mark this way.
 
+Before we reach for it though, there's a *real* gotcha worth knowing — and it's the reason the working example for this post ([`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening)) takes a slightly different shape than you might expect:
+
+> **Linux's `madvise` requires the address to be page-aligned.** `mlock` doesn't (it rounds down internally), but `madvise` does — feed it a non-aligned address and you get `EINVAL`. The `Box` we built in Step 1 hands out *allocator-aligned* memory (8 or 16 bytes), not page-aligned. So a literal "`MADV_DONTDUMP` on the Box" doesn't compile-then-work — it compiles and then fails at runtime.
+
+That leaves two real options:
+
+1. **Defer per-region dump-exclusion until you have page-aligned memory.** That's what Step 6 will give us, via `region::alloc`. Until then, dump coverage for the Box-based key comes from Step 5's process-wide `RLIMIT_CORE = 0` + `PR_SET_DUMPABLE`.
+2. **Round the pointer down to the page boundary and `madvise` the whole page.** Works, but you're now telling the kernel not to dump *all* neighbours sharing that heap page too — which has its own caveats (debuggability, surprise).
+
+The example pursues option 1 for the heap-Box buffer and option "do it for real" for the page-isolated buffer in Step 6. For completeness, the `madvise` call you'd make on a page-aligned region looks like this:
+
 ```rust
-let key = Box::new(Zeroizing::new(load_key()));
-let _lock = region::lock(key.as_ptr(), key.len())?;
+// Only correct when `ptr` is a page-aligned address you own —
+// i.e. NOT a Box, but the result of `region::alloc` (Step 6) or mmap.
 unsafe {
-    os_memlock::madvise_dontdump(key.as_ptr() as *mut _, key.len())?;
+    os_memlock::madvise_dontdump(ptr as *mut _, len)?;
 }
 ```
 
 (`nix` also exposes `madvise` with `MmapAdvise::MADV_DONTDUMP`. On FreeBSD the equivalent is `MADV_NOCORE`. Man page: [`madvise(2)`](https://man7.org/linux/man-pages/man2/madvise.2.html).)
 
-Note that this is *per-region*, not process-wide — it marks the page your key lives on, and only that page, as "don't dump." That's the right granularity here, but it's a hint attached to the allocation. Lose track of the allocation and the marker goes with it. (Disabling dumps for the whole process is a separate, blunter step — we'll get to it in Step 5.)
+It's *per-region*, not process-wide — it marks the page(s) you point at as "don't dump." That's the right granularity once we can satisfy the alignment requirement; the process-wide knob is the blunter Step 5.
 
 ## Step 4: bundle it into a `HardenedKey` type
 
-We've now got three things that have to live and die together: the bytes, the lock guard, and the `MADV_DONTDUMP` advice. If the lock guard drops before the bytes, the page becomes swappable while the secret is still in it. If the bytes are freed without us knowing, the lock and the advice point at memory we no longer own. Holding all three correctly across every early return and `?` is the kind of thing that's easy to get wrong by hand.
+We've now got two things that have to live and die together: the bytes and the lock guard. If the lock guard drops before the bytes, the page becomes swappable while the secret is still in it. If the bytes are freed without us knowing, the lock points at memory we no longer own. Holding both correctly across every early return and `?` is the kind of thing that's easy to get wrong by hand.
 
 The Rust answer is "make them one type and let RAII enforce the ordering."
 
@@ -124,8 +135,9 @@ impl HardenedKey {
         let mut bytes = Box::new(Zeroizing::new([0u8; 32]));
         init(&mut bytes);
         let (ptr, len) = (bytes.as_ptr(), bytes.len());
-        let lock = region::lock(ptr, len)?;                           // pin: no swap
-        unsafe { os_memlock::madvise_dontdump(ptr as *mut _, len)?; } // exclude from dumps
+        let lock = region::lock(ptr, len)?;   // pin: no swap
+        // NOTE: no per-buffer MADV_DONTDUMP here — the Box isn't page-aligned.
+        // For this buffer, dump coverage comes from `harden_process()` in Step 5.
         Ok(Self { bytes, _lock: lock })
     }
 }
@@ -134,10 +146,10 @@ impl HardenedKey {
 What this earns us:
 
 - **Field-order drop semantics.** Rust drops a struct's fields in declaration order. By putting `bytes` first and `_lock` second, the `Zeroizing` wipe runs *while* the page is still locked — so the wipe lands on resident memory, not on memory the kernel just paged out under our feet. (Reversing the field order would be a quiet bug.)
-- **You can't accidentally leak one of the three.** Bytes, lock, and dump-exclusion are wired together — there's no path where one outlives the others or gets forgotten on an early return.
+- **You can't accidentally leak one of the two.** Bytes and lock are wired together — there's no path where one outlives the other or gets forgotten on an early return.
 - **The move hazard from part 1 is genuinely gone.** Moving a `HardenedKey` moves the `Box` pointer and the `LockGuard` handle, not the 32 bytes; the heap allocation stays put, and the lock keeps pointing at the same page.
 
-(Types and crate versions are simplified — check the exact `region::LockGuard` name and signatures against the versions you pin.)
+(Types and crate versions are simplified — see [`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening) for a buildable version pinned to real crate versions.)
 
 ## Step 5: harden the process around it
 
@@ -272,6 +284,8 @@ A few honest things to note about this layer:
 - **`harden_process()` from Step 5 still applies unchanged.** Per-key and process-level controls compose freely.
 
 The pattern itself isn't novel — libsodium and a handful of Rust crates do exactly this. The reason it's tucked behind *"going further"* rather than the recommended baseline is the threat-model shift: it's a tool for a different problem than the rest of this post.
+
+A working version of both `HardenedKey` and `PageProtectedKey` (with the real `unsafe { ... }` blocks the `region` crate's `protect` API actually requires, and pinned crate versions) is in [`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening). `cargo run --release` should print two matching checksums.
 
 ## Where this leaves us
 
