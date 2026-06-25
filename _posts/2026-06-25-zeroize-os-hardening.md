@@ -15,7 +15,7 @@ There are really three things the OS can do with a secret sitting in your RAM, a
 2. **write it into a core dump** when you crash,
 3. **hand it to another process** that reads your live memory.
 
-Rather than touring the three controls separately, let's build a single hardened key buffer one piece at a time — adding each line only when the previous version is missing something — and then harden the process around it. By the end we'll have a small `HardenedKey` type and a one-shot `harden_process()` call.
+Rather than touring the three controls separately, let's build a hardened key buffer one piece at a time — adding each control only when the previous version is missing something — and then harden the process around it. By the end we'll have a small `HardenedKey` type and a one-shot `harden_process()` call, plus a page-isolated variant for a different threat model in the "going further" coda.
 
 ## Starting point: just `Zeroizing`
 
@@ -37,13 +37,24 @@ The stale-copies problem from part 1 has a particularly nasty form once the OS g
 
 The fix is the same one we'd reach for if we cared about the move hazard alone: heap-allocate, so the *pointer* moves but the *bytes* stay put.
 
+There's a subtlety in *how* you put it there, and it's the same one from part 1. The obvious line —
+
+```rust
+let key = Box::new(Zeroizing::new(load_key())); // tempting, but...
+```
+
+— doesn't actually keep the secret off the stack. `load_key()` returns the array *by value*, so the 32 bytes first materialize in a stack temporary; and stable Rust has no placement-`new`, so `Box::new(x)` builds `x` on the stack and *then* memcpys it to the heap. The bytes transit the stack at least once before they ever reach the heap address — exactly the stale copy we're trying to avoid.
+
+So allocate the heap slot *first*, zeroed, and fill it in place:
+
 ```rust
 use zeroize::Zeroizing;
 
-let key = Box::new(Zeroizing::new(load_key()));
+let mut key = Box::new(Zeroizing::new([0u8; 32])); // zeros on the stack — harmless
+load_key_into(&mut key);                           // secret written straight to the heap
 ```
 
-Now the only stack slot that holds anything sensitive holds a pointer, and the 32 bytes live at a fixed heap address that doesn't change just because the owning variable moves around. That stable address matters for everything below: the lock from Step 2 will be pinned to it, the `madvise` from Step 3 will be applied to it, and neither would survive if the bytes themselves moved.
+Now the only stack slot that ever held a *secret* is gone, and the 32 bytes live at a fixed heap address that doesn't change just because the owning variable moves around. (The `HardenedKey::load` in Step 4 wraps this fill-in-place pattern behind an `init` closure.) That stable address matters for everything below: the lock from Step 2 will be pinned to it, the `madvise` from Step 3 will be applied to it, and neither would survive if the bytes themselves moved.
 
 ## Step 2: pin it in RAM so it can't be swapped
 
@@ -72,7 +83,8 @@ For our purposes — keeping a secret out of swap — the one we care about is `
 ```rust
 use zeroize::Zeroizing;
 
-let key = Box::new(Zeroizing::new(load_key()));
+let mut key = Box::new(Zeroizing::new([0u8; 32]));
+load_key_into(&mut key);
 let _lock = region::lock(key.as_ptr(), key.len())?;
 // pages stay resident until `_lock` drops, which calls munlock/VirtualUnlock
 ```
@@ -172,7 +184,7 @@ Man page: [`prctl(2)`](https://man7.org/linux/man-pages/man2/prctl.2.html).
 
 **Block live-memory snooping.** This is the threat the first post admitted `zeroize` can't touch: an attacker who reads your memory *while the process is running*. On Linux the usual route is `ptrace` (or reading `/proc/<pid>/mem`), and a process running as the same user can do it by default. In a world of compromised dependencies and shared hosts, that's not exotic.
 
-Good news: the `prctl(PR_SET_DUMPABLE, 0)` call above pulls double duty. Marking the process non-dumpable also makes it **non-attachable by `ptrace` for anyone who isn't root** — the same single call that quiets core dumps also slams the easy door on live-memory snooping.
+Good news: the `prctl(PR_SET_DUMPABLE, 0)` call above pulls double duty. Marking the process non-dumpable also makes it **non-attachable by `ptrace` for anyone without `CAP_SYS_PTRACE`** (in practice, anyone but root) — the same single call that quiets core dumps also slams the easy door on live-memory snooping.
 
 Wrap both in one startup helper, called *before* any secrets are loaded:
 
@@ -298,6 +310,7 @@ let sig = key.with_readable(|bytes| sign(bytes, &digest))?;
 A few honest things to note about this layer:
 
 - **It defends against bugs, not against a determined attacker.** The page is readable *exactly* when you're using the key — which is also when a deliberate attacker would catch you. The win is against *accidents*: stray pointers, OOB reads, an errant log statement.
+- **The protection state is per-page and process-global, so `with_readable` is not thread-safe.** Two threads calling it on the same key race: one's guard re-seals the page to `PROT_NONE` while the other is still mid-read, and the reader SIGSEGVs. Keep the bracket single-threaded, or wrap it in your own lock. And note the closure can still copy the bytes into its return value — the seal only protects the page, not whatever you carry out of it.
 - **You pay a whole page per key.** `region::alloc(32, ...)` rounds up to the system page size (typically 4 KiB). Fine for a handful of long-lived keys; very much not for thousands of short-lived ones.
 - **It doesn't help with the threats Steps 1–5 already covered.** Swap, core dumps, and `ptrace` all bypass page protections — the bytes-on-disk and bytes-via-tracer paths read the underlying memory regardless of `PROT_*` flags. The `region::lock` and `madvise_dontdump` calls inside `load` are still the load-bearing controls there; the `protect` toggle is *added* on top, not a replacement.
 - **`harden_process()` from Step 5 still applies unchanged.** Per-key and process-level controls compose freely.
