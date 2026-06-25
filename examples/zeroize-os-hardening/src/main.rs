@@ -2,19 +2,19 @@
 //! "Where `zeroize` stops: hardening keys at the OS level".
 //!
 //! Two key buffers:
-//!   * `HardenedKey`       — Step 4: heap Box + `mlock`.
-//!                          (No `MADV_DONTDUMP`: it requires a page-aligned
-//!                          address, which a `Box` doesn't provide.
-//!                          Dump coverage comes from Step 5's process-wide
-//!                          `RLIMIT_CORE = 0` + `PR_SET_DUMPABLE`.)
-//!   * `PageProtectedKey`  — Step 6: dedicated page via `region::alloc`,
-//!                          locked, `MADV_DONTDUMP`'d, kept `PROT_NONE`
-//!                          at rest, briefly flipped to `PROT_READ`
-//!                          inside `with_readable`.
+//!
+//! * `HardenedKey` — Step 4: heap Box + `mlock`. No `MADV_DONTDUMP`: it
+//!   requires a page-aligned address, which a `Box` doesn't provide. Dump
+//!   coverage comes from Step 5's process-wide `RLIMIT_CORE = 0` +
+//!   `PR_SET_DUMPABLE`.
+//! * `PageProtectedKey` — Step 6: dedicated page via `region::alloc`, locked,
+//!   `MADV_DONTDUMP`'d, kept `PROT_NONE` at rest, briefly flipped to
+//!   `PROT_READ` inside `with_readable`.
 //!
 //! And one process-level startup helper:
-//!   * `harden_process()`  — Step 5: `RLIMIT_CORE = 0` + `PR_SET_DUMPABLE`,
-//!                          which also blocks `ptrace` for non-root.
+//!
+//! * `harden_process()` — Step 5: `RLIMIT_CORE = 0` + `PR_SET_DUMPABLE`, which
+//!   also blocks `ptrace` for non-root.
 //!
 //! Run:  cargo run --release
 //!
@@ -47,8 +47,10 @@ fn harden_process() {
 // Step 4: Box-backed buffer.
 // --------------------------------------------------------------------------
 
-/// A 32-byte key on the heap, wiped on drop, pinned in RAM, excluded from
-/// core dumps. Stable address survives moves of `Self`.
+/// A 32-byte key on the heap, wiped on drop and pinned in RAM. Stable address
+/// survives moves of `Self`. Core-dump exclusion for *this* buffer is not
+/// per-region (the Box isn't page-aligned, so no `MADV_DONTDUMP`) — it comes
+/// from the process-wide `harden_process()` knobs in Step 5.
 pub struct HardenedKey {
     bytes: Box<Zeroizing<[u8; KEY_LEN]>>,
     _lock: region::LockGuard,
@@ -176,7 +178,7 @@ impl Drop for PageProtectedKey {
 // --------------------------------------------------------------------------
 
 fn io_err<E: std::fmt::Display>(e: E) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, e.to_string())
+    io::Error::other(e.to_string())
 }
 
 /// Fill `buf` with the DEADBEEF pattern part 1's demo uses, so the
@@ -210,8 +212,8 @@ fn main() -> io::Result<()> {
         "=== Step 6: PageProtectedKey  (region::alloc + mlock + MADV_DONTDUMP + mprotect) ==="
     );
     {
-        let key = PageProtectedKey::load(|buf| load_demo_key(buf))?;
-        let sum = key.with_readable(|bytes| fake_sign(bytes))?;
+        let key = PageProtectedKey::load(load_demo_key)?;
+        let sum = key.with_readable(fake_sign)?;
         println!("  checksum = 0x{sum:016x}");
         // Drops here: custom Drop re-opens R/W, zeroizes the 32 bytes, then
         // LockGuard munlocks the page, then Allocation munmaps it.
