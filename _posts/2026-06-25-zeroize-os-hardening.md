@@ -17,44 +17,28 @@ There are really three things the OS can do with a secret sitting in your RAM, a
 
 Rather than touring the three controls separately, let's build a hardened key buffer one piece at a time — adding each control only when the previous version is missing something — and then harden the process around it. By the end we'll have a small `HardenedKey` type and a one-shot `harden_process()` call, plus a page-isolated variant for a different threat model in the "going further" coda.
 
-## Starting point: just `Zeroizing`
+## Starting point: the heap `Box` from part 1
 
-After part 1, this is where we ended up:
+Part 1 didn't leave us on the stack. It ended by moving the secret onto the heap and filling it in place, precisely so the move hazard couldn't leave stale copies behind:
 
 ```rust
 use zeroize::Zeroizing;
 
-let key = Zeroizing::new(load_key()); // [u8; 32] on the stack
+let mut key = Box::new(Zeroizing::new([0u8; 32])); // allocate first…
+load_key_into(&mut key);                           // …then fill in place
 crypto_op(&key);
 // drops here, wiped
 ```
 
-It compiles, it wipes on drop, and for low-value secrets it's enough. But every problem from part 1 is still here — moves, spills, `mem::forget` — and now the OS is allowed to make things harder on top of that: the page the stack sits on can be swapped to disk, copied into a core dump, or read by another same-user process via `ptrace`. Let's close those gaps one at a time.
+Within the language, that's solid: the secret lives at one fixed heap address, moving `key` only moves the pointer, and `Zeroizing` wipes the single remaining copy on drop. (`mem::forget` and aborts can still skip that wipe — part 1's best-effort caveat hasn't gone away — but the *move*-driven leaks are handled.)
 
-## Step 1: put it on the heap for a stable address
+What the heap `Box` does *not* touch is the operating system. Those 32 bytes still sit on an ordinary, pageable heap page, and the OS is free to copy that page somewhere `zeroize` will never follow: out to the swap file, into a core dump, or into another same-user process that reads your memory via `ptrace`. Closing those three gaps is the whole job of this post — and we'll do it one knob at a time, building up a small `HardenedKey` type as we go.
 
-The stale-copies problem from part 1 has a particularly nasty form once the OS gets involved. Every time the array moves on the stack — a function return, an assignment, an argument pass — Rust memcopies the 32 bytes into a new slot. `zeroize` only wipes the *last* one. Every other stack slot that ever held those bytes can be paged to swap or captured in a core dump, which is exactly what the next two steps are trying to prevent.
+## Step 1: lean on the stable address
 
-The fix is the same one we'd reach for if we cared about the move hazard alone: heap-allocate, so the *pointer* moves but the *bytes* stay put.
+Everything below hangs on one property of that `Box`: its address doesn't move. The kernel controls we're about to reach for — `mlock` to pin the page, `madvise` to exclude it from dumps — all operate on a *specific address range*, and they'd be worse than useless if the bytes wandered off to a new location afterwards. Pin one page, then let the secret move to another, and you've locked an empty page while the live secret sits exposed.
 
-There's a subtlety in *how* you put it there, and it's the same one from part 1. The obvious line —
-
-```rust
-let key = Box::new(Zeroizing::new(load_key())); // tempting, but...
-```
-
-— doesn't actually keep the secret off the stack. `load_key()` returns the array *by value*, so the 32 bytes first materialize in a stack temporary; and stable Rust has no placement-`new`, so `Box::new(x)` builds `x` on the stack and *then* memcpys it to the heap. The bytes transit the stack at least once before they ever reach the heap address — exactly the stale copy we're trying to avoid.
-
-So allocate the heap slot *first*, zeroed, and fill it in place:
-
-```rust
-use zeroize::Zeroizing;
-
-let mut key = Box::new(Zeroizing::new([0u8; 32])); // zeros on the stack — harmless
-load_key_into(&mut key);                           // secret written straight to the heap
-```
-
-Now the only stack slot that ever held a *secret* is gone, and the 32 bytes live at a fixed heap address that doesn't change just because the owning variable moves around. (The `HardenedKey::load` in Step 4 wraps this fill-in-place pattern behind an `init` closure.) That stable address matters for everything below: the lock from Step 2 will be pinned to it, the `madvise` from Step 3 will be applied to it, and neither would survive if the bytes themselves moved.
+That's exactly why part 1's "allocate, then fill in place" shape matters here and not just as a tidiness point: it hands us a fixed heap address we can pin and protect, with no stack copy left over to leak first. The `HardenedKey::load` we arrive at in Step 4 wraps that same pattern behind an `init` closure — but conceptually, the foundation is already in your hand the moment the secret is in a `Box`. So: lock from Step 2 pins this address, `madvise` from Step 3 marks it, and neither would survive if the bytes themselves moved. They don't — so we can build.
 
 ## Step 2: pin it in RAM so it can't be swapped
 
@@ -89,7 +73,7 @@ let _lock = region::lock(key.as_ptr(), key.len())?;
 // pages stay resident until `_lock` drops, which calls munlock/VirtualUnlock
 ```
 
-The `Box` from Step 1 is doing real work here: the lock points at a heap address that *won't move* if `key` is later passed to another function or stored in a struct. If we'd locked a stack `[0u8; 32]` instead, then moved `key`, the lock would still be pinning the original (now stale) stack page and the live bytes would sit on an unlocked one.
+The heap `Box` is doing real work here: the lock points at a heap address that *won't move* if `key` is later passed to another function or stored in a struct. If we'd locked a stack `[0u8; 32]` instead, then moved `key`, the lock would still be pinning the original (now stale) stack page and the live bytes would sit on an unlocked one.
 
 A note on the sibling call: `region::protect` (i.e. `mprotect`/`VirtualProtect`) is a *different* control. It changes the read/write/execute flags on a page — useful for things like marking a buffer no-access between uses, or making JIT pages executable — but it doesn't stop the kernel from paging that memory out. For "don't swap my secret," reach for `lock`; `protect` is a separate axis. (This is also why `secrecy` says it deliberately does neither — it's leaving the OS-level posture to you.)
 
@@ -107,7 +91,7 @@ If the process crashes, the OS can write your whole address space — secrets an
 
 Before we reach for it though, there's a *real* gotcha worth knowing — and it's the reason the working example for this post ([`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening)) takes a slightly different shape than you might expect:
 
-> **Linux's `madvise` requires the address to be page-aligned.** `mlock` doesn't (it rounds down internally), but `madvise` does — feed it a non-aligned address and you get `EINVAL`. The `Box` we built in Step 1 hands out *allocator-aligned* memory (8 or 16 bytes), not page-aligned. So a literal "`MADV_DONTDUMP` on the Box" doesn't compile-then-work — it compiles and then fails at runtime.
+> **Linux's `madvise` requires the address to be page-aligned.** `mlock` doesn't (it rounds down internally), but `madvise` does — feed it a non-aligned address and you get `EINVAL`. The heap `Box` we started from hands out *allocator-aligned* memory (8 or 16 bytes), not page-aligned. So a literal "`MADV_DONTDUMP` on the Box" doesn't compile-then-work — it compiles and then fails at runtime.
 
 That leaves two real options:
 
