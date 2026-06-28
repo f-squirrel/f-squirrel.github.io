@@ -34,13 +34,21 @@ const KEY_LEN: usize = 32;
 // --------------------------------------------------------------------------
 
 fn harden_process() {
+    // Best-effort: a startup hardening helper shouldn't refuse to run because
+    // a container's seccomp profile forbids one syscall. But log every
+    // failure so a hardened-looking process can't quietly be a soft target.
+
     // Disable core dumps (soft = hard = 0). systemd-coredump can ignore this
     // by piping crashes, which is exactly what the next call quiets.
-    let _ = rlimit::setrlimit(rlimit::Resource::CORE, 0, 0);
+    if let Err(e) = rlimit::setrlimit(rlimit::Resource::CORE, 0, 0) {
+        eprintln!("warn: failed to disable core dumps: {e}");
+    }
 
     // PR_SET_DUMPABLE = 0 makes the process non-dumpable (the systemd path
     // honours this) and as a bonus blocks ptrace attach by non-root callers.
-    let _ = prctl::set_dumpable(false);
+    if let Err(e) = prctl::set_dumpable(false) {
+        eprintln!("warn: failed to mark process non-dumpable: {e}");
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -136,7 +144,9 @@ impl PageProtectedKey {
 
     /// Briefly flip the page to read-only, hand the secret to `f`, then
     /// the returned `ProtectGuard` restores `PROT_NONE` at scope exit.
-    pub fn with_readable<R>(&self, f: impl FnOnce(&[u8]) -> R) -> io::Result<R> {
+    /// `&mut self` so the borrow checker forbids concurrent calls on the
+    /// same key — two callers would otherwise race the seal/unseal.
+    pub fn with_readable<R>(&mut self, f: impl FnOnce(&[u8]) -> R) -> io::Result<R> {
         // SAFETY: same live mapping; the guard restores PROT_NONE on drop.
         let _open = unsafe {
             region::protect_with_handle(
@@ -212,7 +222,7 @@ fn main() -> io::Result<()> {
         "=== Step 6: PageProtectedKey  (region::alloc + mlock + MADV_DONTDUMP + mprotect) ==="
     );
     {
-        let key = PageProtectedKey::load(load_demo_key)?;
+        let mut key = PageProtectedKey::load(load_demo_key)?;
         let sum = key.with_readable(fake_sign)?;
         println!("  checksum = 0x{sum:016x}");
         // Drops here: custom Drop re-opens R/W, zeroizes the 32 bytes, then
