@@ -1,5 +1,6 @@
 ---
-title: "Where `zeroize` stops: hardening keys at the OS level"
+title: "I Hardened My Secret. Or Did I?"
+subtitle: "Where `zeroize` stops: keeping keys out of swap, dumps, and other processes"
 published: true
 permalink: "/zeroize-os-hardening"
 tags: [rust, security, cryptography, zeroize, linux]
@@ -96,7 +97,7 @@ Before we reach for it though, there's a *real* gotcha worth knowing — and it'
 That leaves two real options:
 
 1. **Defer per-region dump-exclusion until you have page-aligned memory.** That's what Step 6 will give us, via `region::alloc`. Until then, dump coverage for the Box-based key comes from Step 5's process-wide `RLIMIT_CORE = 0` + `PR_SET_DUMPABLE`.
-2. **Round the pointer down to the page boundary and `madvise` the whole page.** Works, but you're now telling the kernel not to dump *all* neighbours sharing that heap page too — which has its own caveats (debuggability, surprise).
+2. **Round the pointer down to the page boundary and `madvise` the whole page.** It works, but you've now told the kernel to exclude *unrelated heap data* — whatever neighbouring allocations happen to share that page — from your own core dumps. The next time something crashes for a reason that has nothing to do with the secret, the data you'd want for the post-mortem is silently missing.
 
 The example pursues option 1 for the heap-Box buffer and option "do it for real" for the page-isolated buffer in Step 6. For completeness, the `madvise` call you'd make on a page-aligned region looks like this:
 
@@ -174,8 +175,12 @@ Wrap both in one startup helper, called *before* any secrets are loaded:
 
 ```rust
 fn harden_process() {
-    let _ = rlimit::setrlimit(rlimit::Resource::CORE, 0, 0); // no core dumps
-    let _ = prctl::set_dumpable(false);                      // + quiet systemd, + block ptrace
+    if let Err(e) = rlimit::setrlimit(rlimit::Resource::CORE, 0, 0) {
+        eprintln!("warn: failed to disable core dumps: {e}");
+    }
+    if let Err(e) = prctl::set_dumpable(false) {
+        eprintln!("warn: failed to mark process non-dumpable: {e}");
+    }
 }
 
 fn main() -> std::io::Result<()> {
@@ -186,6 +191,8 @@ fn main() -> std::io::Result<()> {
 }
 ```
 
+This is deliberately best-effort — a startup hardening helper shouldn't refuse to run because a container's `seccomp` profile forbids one syscall — but it logs every failure. The shape to avoid is the silent `let _ = ...`: a misconfigured environment then quietly produces a process that *looks* hardened and isn't.
+
 For a system-wide policy there's the Yama LSM, via `/proc/sys/kernel/yama/ptrace_scope`:
 
 - `0` — classic behaviour: any same-user process can attach.
@@ -193,13 +200,17 @@ For a system-wide policy there's the Yama LSM, via `/proc/sys/kernel/yama/ptrace
 - `2` — admin-only (needs `CAP_SYS_PTRACE`).
 - `3` — no attaching at all, for anyone, until reboot.
 
+For a server: pair `ptrace_scope=1` with the `PR_SET_DUMPABLE` call from above, and you've covered most of the same-user threat at minimal cost. For a CLI handling keys interactively, level `2` is worth it if your environment allows it. Level `3` tends to break debugging tooling enough that it's only worth reaching for on sealed appliances.
+
 The honest caveat, same as always: none of this stops a root / `CAP_SYS_PTRACE` attacker, who can lift any of these. What it does is raise the bar a lot against the realistic same-user case — and that's most of the value.
 
 ## Step 6 (going further): a page-isolated variant
 
 Every step above has been about *external* threats — the OS paging memory out, the kernel dumping it on a crash, another process attaching. There's one more category worth knowing about: a stray pointer, out-of-bounds read, or use-after-free *in your own code* that accidentally reads the secret's bytes. The control for that is `mprotect(PROT_NONE)`: deny every access to the page when the key isn't actively in use, so any stray touch SIGSEGVs instead of silently picking up the bytes.
 
-The catch is that `mprotect` works at page granularity, and the heap `Box` from earlier shares its page with allocator metadata and neighbouring allocations — flipping the whole page to `PROT_NONE` would crash anything that touched a neighbour. To use `protect` safely you need a *dedicated* page. That's what `region::alloc` (the `mmap`/`VirtualAlloc` row of the table back in Step 2) is for. Once you own a whole page, `region::lock`, `MADV_DONTDUMP`, *and* `region::protect` can all be applied to it cleanly:
+The catch is that `mprotect` works at page granularity, and the heap `Box` from earlier shares its page with allocator metadata and neighbouring allocations — flipping the whole page to `PROT_NONE` would crash anything that touched a neighbour. To use `protect` safely you need a *dedicated* page. That's what `region::alloc` (the `mmap`/`VirtualAlloc` row of the table back in Step 2) is for. Once you own a whole page, `region::lock`, `MADV_DONTDUMP`, *and* `region::protect` can all be applied to it cleanly.
+
+Drop-order discipline carries over from Step 4, with one extra dance. The custom `Drop` impl below runs first — it re-opens the page for writing, then wipes — and only then do the fields drop in declaration order: `_lock` (`munlock`) before `alloc` (`munmap`), so the unlock lands on still-mapped memory. Reverse the field order and the unlock fires on a region that's already gone.
 
 ```rust
 use std::ffi::c_void;
@@ -209,9 +220,6 @@ use zeroize::Zeroize;
 const KEY_LEN: usize = 32;
 
 struct PageProtectedKey {
-    // Field order matters: _lock must drop *after* the wipe in our Drop impl,
-    // and *before* `alloc` is unmapped. Custom Drop runs first; then fields
-    // drop in declaration order, so list _lock before alloc.
     _lock: region::LockGuard,
     alloc: region::Allocation, // dedicated, page-aligned; PROT_NONE at rest
 }
@@ -246,7 +254,9 @@ impl PageProtectedKey {
     }
 
     /// Briefly flip to read-only, hand the bytes to `f`, then re-seal.
-    fn with_readable<R>(&self, f: impl FnOnce(&[u8]) -> R) -> std::io::Result<R> {
+    /// `&mut self` so the borrow checker enforces the single-threaded use
+    /// the prose talks about — concurrent calls would race the seal/unseal.
+    fn with_readable<R>(&mut self, f: impl FnOnce(&[u8]) -> R) -> std::io::Result<R> {
         // SAFETY: same live mapping; the returned guard restores PROT_NONE on drop.
         let _open = unsafe {
             region::protect_with_handle(
@@ -269,6 +279,9 @@ impl Drop for PageProtectedKey {
         // alloc unmap. (Custom Drop runs *before* the fields drop.)
         // SAFETY: same live mapping; we're about to write KEY_LEN bytes.
         unsafe {
+            // Result swallowed on purpose: if protect fails, the zeroize() call
+            // below SIGSEGVs the process during drop. Dying loudly is better
+            // than silently skipping the wipe and unmapping the page anyway.
             let _ = region::protect(
                 self.alloc.as_ptr::<u8>(),
                 self.alloc.len(),
@@ -286,7 +299,7 @@ impl Drop for PageProtectedKey {
 Usage follows the same bracket pattern libsodium uses with `sodium_mprotect_noaccess` / `sodium_mprotect_readonly`:
 
 ```rust
-let key = PageProtectedKey::load(|buf| load_key_into(buf))?;
+let mut key = PageProtectedKey::load(|buf| load_key_into(buf))?;
 let sig = key.with_readable(|bytes| sign(bytes, &digest))?;
 // page is PROT_NONE again until the next call.
 ```
@@ -294,7 +307,7 @@ let sig = key.with_readable(|bytes| sign(bytes, &digest))?;
 A few honest things to note about this layer:
 
 - **It defends against bugs, not against a determined attacker.** The page is readable *exactly* when you're using the key — which is also when a deliberate attacker would catch you. The win is against *accidents*: stray pointers, OOB reads, an errant log statement.
-- **The protection state is per-page and process-global, so `with_readable` is not thread-safe.** Two threads calling it on the same key race: one's guard re-seals the page to `PROT_NONE` while the other is still mid-read, and the reader SIGSEGVs. Keep the bracket single-threaded, or wrap it in your own lock. And note the closure can still copy the bytes into its return value — the seal only protects the page, not whatever you carry out of it.
+- **The protection state is per-page and process-global.** That's why `with_readable` takes `&mut self`: two threads calling it on the same key would otherwise race — one's guard re-sealing the page to `PROT_NONE` while the other is still mid-read, SIGSEGVing the reader. `&mut self` forces the borrow checker to serialize calls per key for you. And note the closure can still copy the bytes into its return value — the seal only protects the page, not whatever you carry out of it.
 - **You pay a whole page per key.** `region::alloc(32, ...)` rounds up to the system page size (typically 4 KiB). Fine for a handful of long-lived keys; very much not for thousands of short-lived ones.
 - **It doesn't help with the threats Steps 1–5 already covered.** Swap, core dumps, and `ptrace` all bypass page protections — the bytes-on-disk and bytes-via-tracer paths read the underlying memory regardless of `PROT_*` flags. The `region::lock` and `madvise_dontdump` calls inside `load` are still the load-bearing controls there; the `protect` toggle is *added* on top, not a replacement.
 - **`harden_process()` from Step 5 still applies unchanged.** Per-key and process-level controls compose freely.
@@ -325,15 +338,25 @@ But every knob here quietly assumes the plaintext key is sitting in *your* proce
 
 *Further reading:*
 
-- `region` (cross-platform virtual memory: `alloc`, `lock`, `protect`, `query`) — https://docs.rs/region
-- `os-memlock` (mlock + MADV_DONTDUMP) — https://docs.rs/os-memlock
-- `rlimit` — https://docs.rs/rlimit · `prctl` — https://docs.rs/prctl
-- `core(5)` — https://man7.org/linux/man-pages/man5/core.5.html
-- `mlock(2)` — https://man7.org/linux/man-pages/man2/mlock.2.html · `madvise(2)` — https://man7.org/linux/man-pages/man2/madvise.2.html · `mprotect(2)` — https://man7.org/linux/man-pages/man2/mprotect.2.html · `prctl(2)` — https://man7.org/linux/man-pages/man2/prctl.2.html
-- Yama / `ptrace_scope` — https://docs.kernel.org/admin-guide/LSM/Yama.html · `ptrace(2)` — https://man7.org/linux/man-pages/man2/ptrace.2.html
-- libsodium guarded heap allocation (the production-grade version of Step 6, with guard pages and a canary) — https://doc.libsodium.org/memory_management · source: [`src/libsodium/sodium/utils.c`](https://github.com/jedisct1/libsodium/blob/master/src/libsodium/sodium/utils.c) (`sodium_malloc` / `sodium_mprotect_noaccess` / `sodium_mprotect_readonly` / `sodium_mprotect_readwrite`)
+**Crates**
+
+- `region` — cross-platform virtual memory: `alloc`, `lock`, `protect`, `query` — https://docs.rs/region
+- `os-memlock` — mlock + MADV_DONTDUMP — https://docs.rs/os-memlock
+- `rlimit` — https://docs.rs/rlimit
+- `prctl` — https://docs.rs/prctl
 - `secrets` — ergonomic Rust wrapper over libsodium's guarded allocation (`SecretBox` / `SecretVec`, the recommended way to use the Step 6 pattern in production) — https://crates.io/crates/secrets
 - `memsec` — a Rust port of libsodium's secure-allocation primitives; on Linux ≥ 5.14 also exposes `memfd_secret` — https://docs.rs/memsec
 - `secmem-alloc` — secret-memory custom allocator for `Box::new_in` / `Vec::new_in` — https://crates.io/crates/secmem-alloc
 - `secrecy` — ergonomic `Secret<T>` / `ExposeSecret` (zeroize + `Debug` redaction *only* — no mlock/mprotect/MADV) — https://docs.rs/secrecy
+
+**Kernel and libc docs**
+
+- `core(5)` — https://man7.org/linux/man-pages/man5/core.5.html
+- `mlock(2)` — https://man7.org/linux/man-pages/man2/mlock.2.html
+- `madvise(2)` — https://man7.org/linux/man-pages/man2/madvise.2.html
+- `mprotect(2)` — https://man7.org/linux/man-pages/man2/mprotect.2.html
+- `prctl(2)` — https://man7.org/linux/man-pages/man2/prctl.2.html
+- `ptrace(2)` — https://man7.org/linux/man-pages/man2/ptrace.2.html
 - `memfd_secret(2)` — Linux ≥ 5.14, kernel-level secret memory beyond what `mlock`/`mprotect` reach — https://man7.org/linux/man-pages/man2/memfd_secret.2.html
+- Yama / `ptrace_scope` — https://docs.kernel.org/admin-guide/LSM/Yama.html
+- libsodium guarded heap allocation (the production-grade version of Step 6, with guard pages and a canary) — https://doc.libsodium.org/memory_management · source: [`src/libsodium/sodium/utils.c`](https://github.com/jedisct1/libsodium/blob/master/src/libsodium/sodium/utils.c) (`sodium_malloc` / `sodium_mprotect_noaccess` / `sodium_mprotect_readonly` / `sodium_mprotect_readwrite`)
