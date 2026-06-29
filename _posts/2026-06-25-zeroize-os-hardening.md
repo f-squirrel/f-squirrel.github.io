@@ -419,10 +419,10 @@ A working version of both `HardenedKey` and `PageProtectedKey` (with the real `u
 
 Stacked up, these controls shrink the window in which your secret is recoverable: off the swap file, out of crash dumps, away from same-user snooping, and — at the cost of a page per key — out of reach of accidental in-process reads. For a lot of keys that's enough.
 
-But every knob here quietly assumes the plaintext key is sitting in *your* process's RAM. The next layer makes that assumption false: HSMs, threshold signing, and enclaves arrange for the key never to be in your process at all.
+But every knob here quietly assumes the plaintext key is sitting in *your* process's RAM — and as the `PageProtectedKey` caveat made clear, any code sharing your address space can undo your protections. The next post makes that assumption false without special hardware: privilege separation moves the key into a separate process that your dependencies can't reach, and the Linux kernel keyring keeps it in kernel memory where no pointer can follow.
 
 ← Previous: [I Zeroized My Secret. Or Did I?](/zeroize)
-<!-- → Next: [Don't hold the key: architecture for secrets you can't afford to lose](./part-3-architecture.md) -->
+<!-- → Next: TODO -->
 
 ---
 
