@@ -1,27 +1,33 @@
 //! Working companion to the blog post
-//! "Where `zeroize` stops: hardening keys at the OS level".
+//! "Where `zeroize` stops: keeping keys out of swap, dumps, and other processes".
 //!
 //! Two key buffers:
 //!
-//! * `HardenedKey` — Step 4: heap Box + `mlock`. No `MADV_DONTDUMP`: it
+//! * `HardenedKey` — heap Box + `mlock`. No `MADV_DONTDUMP`: it
 //!   requires a page-aligned address, which a `Box` doesn't provide. Dump
-//!   coverage comes from Step 5's process-wide `RLIMIT_CORE = 0` +
+//!   coverage comes from the process-wide `RLIMIT_CORE = 0` +
 //!   `PR_SET_DUMPABLE`.
-//! * `PageProtectedKey` — Step 6: dedicated page via `region::alloc`, locked,
+//! * `PageProtectedKey` — dedicated page via `region::alloc`, locked,
 //!   `MADV_DONTDUMP`'d, kept `PROT_NONE` at rest, briefly flipped to
 //!   `PROT_READ` inside `with_readable`.
 //!
 //! And one process-level startup helper:
 //!
-//! * `harden_process()` — Step 5: `RLIMIT_CORE = 0` + `PR_SET_DUMPABLE`, which
+//! * `harden_process()` — `RLIMIT_CORE = 0` + `PR_SET_DUMPABLE`, which
 //!   also blocks `ptrace` for non-root.
 //!
-//! Run:  cargo run --release
+//! Modes:
 //!
-//! Linux/FreeBSD: full MADV_DONTDUMP path. Other Unixes: os-memlock returns
-//! Unsupported and we treat it as best-effort. Linux is the well-trodden case.
+//!   (no args)        Run both key types, print checksums (default)
+//!   live             Load key unhardened, sleep for /proc/pid/mem scanning
+//!   live-hardened    Load key hardened, sleep for scanning
+//!   crash            Load key unhardened, abort (core dump demo)
+//!   crash-hardened   Load key hardened, abort (core dump demo)
+//!
+//! See README.md for system setup and full walkthrough.
 
 use std::ffi::c_void;
+use std::hint::black_box;
 use std::io;
 
 use region::Protection;
@@ -30,7 +36,7 @@ use zeroize::{Zeroize, Zeroizing};
 const KEY_LEN: usize = 32;
 
 // --------------------------------------------------------------------------
-// Step 5: process-level hardening.
+// Process-level hardening.
 // --------------------------------------------------------------------------
 
 fn harden_process() {
@@ -52,13 +58,13 @@ fn harden_process() {
 }
 
 // --------------------------------------------------------------------------
-// Step 4: Box-backed buffer.
+// HardenedKey (Box + mlock).
 // --------------------------------------------------------------------------
 
 /// A 32-byte key on the heap, wiped on drop and pinned in RAM. Stable address
 /// survives moves of `Self`. Core-dump exclusion for *this* buffer is not
 /// per-region (the Box isn't page-aligned, so no `MADV_DONTDUMP`) — it comes
-/// from the process-wide `harden_process()` knobs in Step 5.
+/// from the process-wide `harden_process()` knobs.
 pub struct HardenedKey {
     bytes: Box<Zeroizing<[u8; KEY_LEN]>>,
     _lock: region::LockGuard,
@@ -81,8 +87,8 @@ impl HardenedKey {
         // requires the address to be page-aligned, and `Box`'s allocator
         // alignment isn't. Per-region MADV_DONTDUMP needs a page-aligned
         // allocation — that's `PageProtectedKey` below (via `region::alloc`).
-        // For *this* buffer the dump coverage comes from Step 5's
-        // process-wide RLIMIT_CORE=0 + PR_SET_DUMPABLE.
+        // For *this* buffer the dump coverage comes from process-wide
+        // RLIMIT_CORE=0 + PR_SET_DUMPABLE.
 
         Ok(Self { bytes, _lock: lock })
     }
@@ -93,7 +99,7 @@ impl HardenedKey {
 }
 
 // --------------------------------------------------------------------------
-// Step 6: page-isolated buffer (region::alloc + mprotect bracket).
+// PageProtectedKey (region::alloc + mprotect bracket).
 // --------------------------------------------------------------------------
 
 /// A 32-byte key that owns a whole dedicated page, kept `PROT_NONE` while
@@ -109,20 +115,20 @@ pub struct PageProtectedKey {
 
 impl PageProtectedKey {
     pub fn load(init: impl FnOnce(&mut [u8])) -> io::Result<Self> {
-        // Step 6.1 — Whole page, initially writable so we can fill it.
+        // Whole page, initially writable so we can fill it.
         let mut alloc =
             region::alloc(KEY_LEN, Protection::READ_WRITE).map_err(io_err)?;
         let ptr: *const u8 = alloc.as_ptr::<u8>();
         let len: usize = alloc.len(); // page-rounded (typically 4096)
 
-        // Step 6.2 — Pin the whole page in RAM, exclude it from dumps.
+        // Pin the whole page in RAM, exclude it from dumps.
         let lock = region::lock(ptr, len).map_err(io_err)?;
         // SAFETY: `ptr`/`len` describe a live, owned, page-aligned mmap region.
         unsafe {
             os_memlock::madvise_dontdump(ptr as *mut c_void, len)?;
         }
 
-        // Step 6.3 — Fill in the secret through the only window we'll allow.
+        // Fill in the secret through the only window we'll allow.
         // SAFETY: alloc is page-rounded and at least KEY_LEN bytes.
         {
             let bytes = unsafe {
@@ -131,9 +137,9 @@ impl PageProtectedKey {
             init(bytes);
         }
 
-        // Step 6.4 — Seal: no access until something deliberately opens it.
+        // Seal: no access until something deliberately opens it.
         // SAFETY: `ptr`/`len` describe the same live mapping; the slice from
-        // 6.3 has gone out of scope, so flipping to PROT_NONE doesn't
+        // above has gone out of scope, so flipping to PROT_NONE doesn't
         // dangle any reference.
         unsafe {
             region::protect(ptr, len, Protection::NONE).map_err(io_err)?;
@@ -184,7 +190,7 @@ impl Drop for PageProtectedKey {
 }
 
 // --------------------------------------------------------------------------
-// Demo helpers.
+// Helpers.
 // --------------------------------------------------------------------------
 
 fn io_err<E: std::fmt::Display>(e: E) -> io::Error {
@@ -206,29 +212,135 @@ fn fake_sign(bytes: &[u8]) -> u64 {
     bytes.iter().fold(0u64, |acc, &b| acc.wrapping_add(b as u64))
 }
 
-fn main() -> io::Result<()> {
+fn sleep(secs: u64) {
+    std::thread::sleep(std::time::Duration::from_secs(secs));
+}
+
+/// Print the VmLck line from /proc/self/status to confirm mlock worked.
+fn print_vmlck(pid: u32) {
+    if let Ok(status) = std::fs::read_to_string(format!("/proc/{pid}/status")) {
+        for line in status.lines() {
+            if line.starts_with("VmLck:") {
+                println!("  {line}");
+                return;
+            }
+        }
+    }
+    println!("  (VmLck not available on this platform)");
+}
+
+// --------------------------------------------------------------------------
+// Demo modes.
+// --------------------------------------------------------------------------
+
+/// Default: run both key types, print matching checksums.
+fn run_checksums() -> io::Result<()> {
     harden_process();
 
-    println!("=== Step 4: HardenedKey  (Box + mlock) ===");
+    println!("=== HardenedKey (Box + mlock) ===");
     {
         let key = HardenedKey::load(|buf| load_demo_key(buf))?;
         let sum = fake_sign(key.as_bytes());
         println!("  checksum = 0x{sum:016x}");
-        // Drops here: Zeroizing wipes the 32 bytes while the page is still
-        // locked, then LockGuard drops and munlocks the page.
     }
 
     println!(
-        "=== Step 6: PageProtectedKey  (region::alloc + mlock + MADV_DONTDUMP + mprotect) ==="
+        "=== PageProtectedKey (region::alloc + mlock + MADV_DONTDUMP + mprotect) ==="
     );
     {
         let mut key = PageProtectedKey::load(load_demo_key)?;
         let sum = key.with_readable(fake_sign)?;
         println!("  checksum = 0x{sum:016x}");
-        // Drops here: custom Drop re-opens R/W, zeroizes the 32 bytes, then
-        // LockGuard munlocks the page, then Allocation munmaps it.
     }
 
     println!("done.");
     Ok(())
+}
+
+/// Load key and sleep, with or without hardening.  The reader scans
+/// /proc/<pid>/mem from another terminal.
+fn run_live(harden: bool) -> io::Result<()> {
+    let label = if harden { "HARDENED" } else { "UNHARDENED" };
+
+    if harden {
+        harden_process();
+        println!("Process hardened (RLIMIT_CORE=0, PR_SET_DUMPABLE=0).");
+    } else {
+        println!("Process NOT hardened.");
+    }
+    println!();
+
+    let key = HardenedKey::load(|buf| load_demo_key(buf))?;
+    let sum = fake_sign(key.as_bytes());
+    let pid = std::process::id();
+
+    println!("=== {label}: key is LIVE (checksum 0x{sum:016x}) ===");
+    println!("PID {pid}");
+    print_vmlck(pid);
+    println!();
+    println!("Try in another terminal:");
+    println!("  python3 scan_mem.py {pid}        # same-user scan");
+    println!("  sudo python3 scan_mem.py {pid}   # root scan");
+    println!();
+    println!("Sleeping 30 s \u{2026}");
+    sleep(30);
+
+    drop(key);
+    println!();
+    println!("=== {label}: key DROPPED (zeroized) ===");
+    println!("Scan again to verify it's gone:");
+    println!("  sudo python3 scan_mem.py {pid}");
+    println!();
+    println!("Sleeping 15 s \u{2026}");
+    sleep(15);
+
+    Ok(())
+}
+
+/// Load key and abort immediately — produces a core dump (if enabled).
+fn run_crash(harden: bool) -> io::Result<()> {
+    let label = if harden { "HARDENED" } else { "UNHARDENED" };
+
+    if harden {
+        harden_process();
+    }
+
+    let key = HardenedKey::load(|buf| load_demo_key(buf))?;
+    let sum = fake_sign(key.as_bytes());
+    let pid = std::process::id();
+
+    eprintln!("{label}: key loaded (checksum 0x{sum:016x}), PID {pid}");
+    eprintln!("Aborting \u{2014} check for core.{pid} afterwards.");
+
+    // Keep the key live at the crash point so the core dump captures it.
+    // abort() diverges — Drop never runs, the secret stays in memory.
+    black_box(&key);
+    std::process::abort();
+}
+
+fn print_usage() {
+    eprintln!("usage: zeroize-os-hardening [command]");
+    eprintln!();
+    eprintln!("commands:");
+    eprintln!("  (none)          run both key types, print checksums");
+    eprintln!("  live            load key unhardened, sleep for scanning");
+    eprintln!("  live-hardened   load key hardened, sleep for scanning");
+    eprintln!("  crash           load key unhardened, abort (core dump demo)");
+    eprintln!("  crash-hardened  load key hardened, abort (core dump demo)");
+    eprintln!();
+    eprintln!("see README.md for system setup and full walkthrough.");
+}
+
+fn main() -> io::Result<()> {
+    match std::env::args().nth(1).as_deref() {
+        None => run_checksums(),
+        Some("live") => run_live(false),
+        Some("live-hardened") => run_live(true),
+        Some("crash") => run_crash(false),
+        Some("crash-hardened") => run_crash(true),
+        _ => {
+            print_usage();
+            std::process::exit(2);
+        }
+    }
 }
