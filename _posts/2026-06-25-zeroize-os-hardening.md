@@ -212,12 +212,12 @@ The companion example ([`examples/zeroize-os-hardening`](https://github.com/f-sq
 
 ```text
 $ cargo run --release -- crash
-UNHARDENED: key loaded (checksum 0x00000000000019c0), PID 54321
-Aborting — check for core.54321 afterwards.
+UNHARDENED: key loaded (checksum 0x00000000000019c0), PID 2703676
+Aborting — check for core.2703676 afterwards.
 Aborted (core dumped)
 
-$ python3 scan_core.py core.54321
-  hit at offset 0x3deaf0
+$ python3 scan_core.py core.2703676
+  hit at offset 0xab50
 Found 1 occurrence(s) of the 32-byte DEADBEEF pattern
 ```
 
@@ -225,12 +225,12 @@ With `harden_process()` — `RLIMIT_CORE = 0` plus `PR_SET_DUMPABLE = 0` — no 
 
 ```text
 $ cargo run --release -- crash-hardened
-HARDENED: key loaded (checksum 0x00000000000019c0), PID 54322
-Aborting — check for core.54322 afterwards.
+HARDENED: key loaded (checksum 0x00000000000019c0), PID 2703885
+Aborting — check for core.2703885 afterwards.
 Aborted
 
-$ ls core.54322
-ls: cannot access 'core.54322': No such file or directory
+$ ls core.2703885
+ls: cannot access 'core.2703885': No such file or directory
 ```
 
 **Same-user memory scan.** With `ptrace_scope = 0` (classic), a same-user process can walk `/proc/<pid>/mem` for the DEADBEEF pattern — exactly the `scan_mem.py` attack from part 1:
@@ -241,13 +241,13 @@ $ cargo run --release -- live
 Process NOT hardened.
 
 === UNHARDENED: key is LIVE (checksum 0x00000000000019c0) ===
-PID 55000
+PID 2704053
   VmLck:         4 kB
 
 # Terminal 2 (same user, no sudo)
-$ python3 scan_mem.py 55000
-  hit at 0x564a3e800ae0 in [heap]
-Found 1 occurrence(s) of the 32-byte DEADBEEF pattern in PID 55000
+$ python3 scan_mem.py 2704053
+  hit at 0x63abb893bb50 in [heap]
+Found 1 occurrence(s) of the 32-byte DEADBEEF pattern in PID 2704053
 ```
 
 That `VmLck: 4 kB` line confirms `mlock` did its job — one page is pinned and won't be swapped. But the secret is still visible to any same-user process that reads our memory.
@@ -260,21 +260,21 @@ $ cargo run --release -- live-hardened
 Process hardened (RLIMIT_CORE=0, PR_SET_DUMPABLE=0).
 
 === HARDENED: key is LIVE (checksum 0x00000000000019c0) ===
-PID 55001
+PID 2704258
   VmLck:         4 kB
 
 # Terminal 2 (same user, no sudo)
-$ python3 scan_mem.py 55001
-Permission denied reading /proc/55001/maps
+$ python3 scan_mem.py 2704258
+Permission denied reading /proc/2704258/maps
 (Process is likely non-dumpable — PR_SET_DUMPABLE is off.)
 ```
 
 **Root still walks right through.** Against the same hardened process:
 
 ```text
-$ sudo python3 scan_mem.py 55001
-  hit at 0x564a3e800ae0 in [heap]
-Found 1 occurrence(s) of the 32-byte DEADBEEF pattern in PID 55001
+$ sudo python3 scan_mem.py 2704258
+  hit at 0x63abb893bb50 in [heap]
+Found 1 occurrence(s) of the 32-byte DEADBEEF pattern in PID 2704258
 ```
 
 Five syscalls, and root reads the key in one line. What we've closed is the *same-user, non-root* window — which is most of the realistic threat surface for a compromised dependency or a nosy co-tenant.
@@ -282,8 +282,8 @@ Five syscalls, and root reads the key in one line. What we've closed is the *sam
 **After drop, the secret is gone.** Once the `live` or `live-hardened` process prints "key DROPPED," scanning again confirms `Zeroizing` did its job:
 
 ```text
-$ sudo python3 scan_mem.py 55001
-Found 0 occurrence(s) of the 32-byte DEADBEEF pattern in PID 55001
+$ python3 scan_mem.py 2706794
+Found 0 occurrence(s) of the 32-byte DEADBEEF pattern in PID 2706794
 ```
 
 ## Going further: a page-isolated variant
@@ -386,6 +386,23 @@ let sig = key.with_readable(|bytes| sign(bytes, &digest))?;
 // page is PROT_NONE again until the next call.
 ```
 
+The `live-page-protected` demo mode in the companion example lets you watch the bracket in action. While the page is sealed (`PROT_NONE`), the scanner reads `/proc/<pid>/maps`, sees `---p`, and skips the region — finding nothing:
+
+```text
+# page sealed
+$ python3 scan_mem.py 2705892
+Found 0 occurrence(s) of the 32-byte DEADBEEF pattern in PID 2705892
+
+# page briefly unsealed to PROT_READ inside with_readable
+$ python3 scan_mem.py 2705892
+  hit at 0x76517a984000 in (anonymous)
+Found 1 occurrence(s) of the 32-byte DEADBEEF pattern in PID 2705892
+
+# page re-sealed
+$ python3 scan_mem.py 2705892
+Found 0 occurrence(s) of the 32-byte DEADBEEF pattern in PID 2705892
+```
+
 A few honest things to note about this layer:
 
 - **It defends against bugs, not against a determined attacker.** The page is readable *exactly* when you're using the key — which is also when a deliberate attacker would catch you. The win is against *accidents*: stray pointers, OOB reads, an errant log statement.
@@ -405,7 +422,7 @@ And then the one *not* to reach for here: **[`secrecy`](https://docs.rs/secrecy)
 
 The reason all of this is tucked behind *"going further"* rather than the recommended baseline is the threat-model shift: it's a tool for a different problem than the rest of this post.
 
-A working version of both `HardenedKey` and `PageProtectedKey` (with the real `unsafe { ... }` blocks the `region` crate's `protect` API actually requires, and pinned crate versions) is in [`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening). `cargo run --release` prints two matching checksums; the `live`, `live-hardened`, `crash`, and `crash-hardened` modes run the demos from "Trying it" above.
+A working version of both `HardenedKey` and `PageProtectedKey` (with the real `unsafe { ... }` blocks the `region` crate's `protect` API actually requires, and pinned crate versions) is in [`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening). `cargo run --release` prints two matching checksums; the `live`, `live-hardened`, `live-page-protected`, `crash`, and `crash-hardened` modes run the demos from "Trying it" above and this section.
 
 ## Where this leaves us
 

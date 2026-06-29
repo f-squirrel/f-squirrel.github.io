@@ -22,6 +22,7 @@ cargo build --release
 | *(none)* | Run both `HardenedKey` and `PageProtectedKey`, print matching checksums |
 | `live` | Load key **unhardened**, sleep 30 s for `/proc/pid/mem` scanning |
 | `live-hardened` | Load key **hardened** (`RLIMIT_CORE=0`, `PR_SET_DUMPABLE=0`), sleep 30 s |
+| `live-page-protected` | `PageProtectedKey`: page is `PROT_NONE` at rest, briefly unsealed to `PROT_READ` |
 | `crash` | Load key **unhardened**, abort immediately (core dump demo) |
 | `crash-hardened` | Load key **hardened**, abort immediately (core dump demo) |
 
@@ -151,6 +152,47 @@ sudo python3 scan_mem.py <PID>
 ```
 
 `Zeroizing` wiped the heap buffer on drop — the secret is gone.
+
+### Demo 7 — PageProtectedKey: PROT_NONE hides from scanner
+
+This mode does not call `harden_process()` — it isolates the `PROT_NONE`
+effect.  The page-isolated key is kept `PROT_NONE` at rest.  The scanner reads
+`/proc/pid/maps`, sees `---p` (no permissions), and skips the region — so
+it finds nothing while the page is sealed.
+
+```bash
+# Terminal 1
+cargo run --release -- live-page-protected
+# → "PageProtectedKey demo (PROT_NONE at rest, no process hardening)."
+# → "PID <PID>"
+# → "  VmLck:        4 kB"
+# → "Scan now — the page is sealed, scanner won't find it:"
+# → "Sleeping 30 s …"
+
+# Terminal 2
+python3 scan_mem.py <PID>
+# → Found 0 occurrence(s) …           ← sealed page is invisible
+```
+
+Wait for "unsealing page to PROT_READ", then scan again:
+
+```bash
+python3 scan_mem.py <PID>
+# →   hit at 0x… in (anonymous)
+# → Found 1 occurrence(s) …           ← briefly visible while unsealed
+```
+
+Wait for "page re-sealed to PROT_NONE", scan one more time:
+
+```bash
+python3 scan_mem.py <PID>
+# → Found 0 occurrence(s) …           ← sealed again, invisible
+```
+
+The bracket pattern in action: the secret is only reachable during the
+`with_readable` window.  Note: root could still force-read the address via
+`/proc/pid/mem` by seeking past the maps filter — `PROT_NONE` is a defence
+against bugs and casual scanning, not a determined attacker.
 
 ## Restore system settings
 

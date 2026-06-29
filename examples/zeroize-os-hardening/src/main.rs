@@ -18,11 +18,12 @@
 //!
 //! Modes:
 //!
-//!   (no args)        Run both key types, print checksums (default)
-//!   live             Load key unhardened, sleep for /proc/pid/mem scanning
-//!   live-hardened    Load key hardened, sleep for scanning
-//!   crash            Load key unhardened, abort (core dump demo)
-//!   crash-hardened   Load key hardened, abort (core dump demo)
+//!   (no args)            Run both key types, print checksums (default)
+//!   live                 Load key unhardened, sleep for /proc/pid/mem scanning
+//!   live-hardened        Load key hardened, sleep for scanning
+//!   live-page-protected  PageProtectedKey: PROT_NONE at rest, briefly unsealed
+//!   crash                Load key unhardened, abort (core dump demo)
+//!   crash-hardened       Load key hardened, abort (core dump demo)
 //!
 //! See README.md for system setup and full walkthrough.
 
@@ -297,6 +298,53 @@ fn run_live(harden: bool) -> io::Result<()> {
     Ok(())
 }
 
+/// Load key into a PageProtectedKey (PROT_NONE at rest) and sleep.
+/// Even `sudo scan_mem.py` finds nothing — the page is `---p` in
+/// /proc/pid/maps so the scanner skips it.  Then briefly unseal so
+/// the reader can scan again and catch it while readable.
+fn run_live_page_protected() -> io::Result<()> {
+    // Deliberately no harden_process() here — we want to isolate the
+    // PROT_NONE effect.  The live-hardened demo already showed PR_SET_DUMPABLE.
+    println!("PageProtectedKey demo (PROT_NONE at rest, no process hardening).");
+    println!();
+
+    let mut key = PageProtectedKey::load(load_demo_key)?;
+    let pid = std::process::id();
+
+    println!("=== PAGE-PROTECTED: key is LIVE but page is PROT_NONE ===");
+    println!("PID {pid}");
+    print_vmlck(pid);
+    println!();
+    println!("Scan now — the page is sealed, scanner won't find it:");
+    println!("  sudo python3 scan_mem.py {pid}");
+    println!();
+    println!("Sleeping 30 s …");
+    sleep(30);
+
+    // Briefly unseal to PROT_READ so the scanner can catch it.
+    println!();
+    println!("=== PAGE-PROTECTED: unsealing page to PROT_READ ===");
+    println!("Scan now — the page is readable, scanner will find it:");
+    println!("  sudo python3 scan_mem.py {pid}");
+    println!();
+    println!("Sleeping 30 s …");
+    let _sum = key.with_readable(|bytes| {
+        black_box(fake_sign(bytes));
+        sleep(30);
+    })?;
+
+    // Page is re-sealed to PROT_NONE after with_readable returns.
+    println!();
+    println!("=== PAGE-PROTECTED: page re-sealed to PROT_NONE ===");
+    println!("Scan again — sealed, scanner won't find it:");
+    println!("  sudo python3 scan_mem.py {pid}");
+    println!();
+    println!("Sleeping 15 s …");
+    sleep(15);
+
+    Ok(())
+}
+
 /// Load key and abort immediately — produces a core dump (if enabled).
 fn run_crash(harden: bool) -> io::Result<()> {
     let label = if harden { "HARDENED" } else { "UNHARDENED" };
@@ -322,11 +370,12 @@ fn print_usage() {
     eprintln!("usage: zeroize-os-hardening [command]");
     eprintln!();
     eprintln!("commands:");
-    eprintln!("  (none)          run both key types, print checksums");
-    eprintln!("  live            load key unhardened, sleep for scanning");
-    eprintln!("  live-hardened   load key hardened, sleep for scanning");
-    eprintln!("  crash           load key unhardened, abort (core dump demo)");
-    eprintln!("  crash-hardened  load key hardened, abort (core dump demo)");
+    eprintln!("  (none)              run both key types, print checksums");
+    eprintln!("  live                load key unhardened, sleep for scanning");
+    eprintln!("  live-hardened       load key hardened, sleep for scanning");
+    eprintln!("  live-page-protected PageProtectedKey: PROT_NONE at rest");
+    eprintln!("  crash               load key unhardened, abort (core dump demo)");
+    eprintln!("  crash-hardened      load key hardened, abort (core dump demo)");
     eprintln!();
     eprintln!("see README.md for system setup and full walkthrough.");
 }
@@ -336,6 +385,7 @@ fn main() -> io::Result<()> {
         None => run_checksums(),
         Some("live") => run_live(false),
         Some("live-hardened") => run_live(true),
+        Some("live-page-protected") => run_live_page_protected(),
         Some("crash") => run_crash(false),
         Some("crash-hardened") => run_crash(true),
         _ => {
