@@ -97,6 +97,24 @@
     border-color: #404040;
 }
 
+/* Tables (exclude code-block tables inside .highlight) */
+[data-theme="dark"] table:not(.highlight table) tr {
+    border-top-color: #404040;
+    background-color: #1a1a1a;
+}
+
+[data-theme="dark"] table:not(.highlight table) tr:nth-child(2n) {
+    background-color: #2d2d2d;
+}
+
+[data-theme="dark"] table:not(.highlight table) tr th {
+    border-color: #404040;
+}
+
+[data-theme="dark"] table:not(.highlight table) tr td {
+    border-color: #404040;
+}
+
 /* Blockquotes */
 [data-theme="dark"] blockquote {
     border-left: 5px solid #666;
