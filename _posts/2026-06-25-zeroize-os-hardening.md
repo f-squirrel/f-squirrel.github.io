@@ -20,7 +20,7 @@ Rather than touring the three controls separately, let's build a hardened key bu
 
 ## Starting point: the heap `Box` from part 1
 
-Part 1 didn't leave us on the stack. It ended by moving the secret onto the heap and filling it in place, precisely so the move hazard couldn't leave stale copies behind:
+Part 1's move-hazard fix ended by moving the secret onto the heap and filling it in place, precisely so no stale copies were left behind:
 
 ```rust
 use zeroize::Zeroizing;
@@ -292,10 +292,11 @@ Every step above has been about *external* threats — the OS paging memory out,
 
 The catch is that `mprotect` works at page granularity, and the heap `Box` from earlier shares its page with allocator metadata and neighbouring allocations — flipping the whole page to `PROT_NONE` would crash anything that touched a neighbour. To use `protect` safely you need a *dedicated* page. That's what `region::alloc` (the `mmap`/`VirtualAlloc` row of the table earlier) is for. Once you own a whole page, `region::lock`, `MADV_DONTDUMP`, *and* `region::protect` can all be applied to it cleanly.
 
-Drop-order discipline carries over from `HardenedKey`, with one extra dance. The custom `Drop` impl below runs first — it re-opens the page for writing, then wipes — and only then do the fields drop in declaration order: `_lock` (`munlock`) before `alloc` (`munmap`), so the unlock lands on still-mapped memory. Reverse the field order and the unlock fires on a region that's already gone.
+Drop-order discipline matters here too, but the field order is *reversed* from `HardenedKey` — and for good reason. `HardenedKey` puts `bytes` first so the `Zeroizing` wipe runs while the lock is still held. `PageProtectedKey` doesn't need that: it has a custom `Drop` that re-opens the page and wipes *before* any field drops. What matters after the custom `Drop` is that `_lock` (`munlock`) drops before `alloc` (`munmap`), so the unlock lands on still-mapped memory. That's why `_lock` comes first here. Reverse the field order and the unlock fires on a region that's already gone.
 
 ```rust
 use std::ffi::c_void;
+use std::io;
 use region::Protection;
 use zeroize::Zeroize;
 
@@ -306,16 +307,21 @@ struct PageProtectedKey {
     alloc: region::Allocation, // dedicated, page-aligned; PROT_NONE at rest
 }
 
+fn io_err<E: std::fmt::Display>(e: E) -> io::Error {
+    io::Error::other(e.to_string())
+}
+
 impl PageProtectedKey {
-    fn load(init: impl FnOnce(&mut [u8])) -> std::io::Result<Self> {
+    fn load(init: impl FnOnce(&mut [u8])) -> io::Result<Self> {
         // 1. Whole page, initially writable so we can fill it.
-        let mut alloc = region::alloc(KEY_LEN, Protection::READ_WRITE)?;
+        let mut alloc = region::alloc(KEY_LEN, Protection::READ_WRITE)
+            .map_err(io_err)?;
         let ptr: *const u8 = alloc.as_ptr::<u8>();
         let len: usize = alloc.len(); // page-rounded (typically 4096)
 
-        // 2. Pin and exclude-from-dumps — same as Steps 2 and 3, just on a
+        // 2. Pin and exclude-from-dumps — same controls as earlier, just on a
         //    whole page instead of a corner of one.
-        let _lock = region::lock(ptr, len)?;
+        let _lock = region::lock(ptr, len).map_err(io_err)?;
         // SAFETY: ptr/len describe a live, owned, page-aligned mmap region.
         unsafe { os_memlock::madvise_dontdump(ptr as *mut c_void, len)?; }
 
@@ -331,21 +337,22 @@ impl PageProtectedKey {
         // 4. Seal: no access at all until something deliberately opens it.
         // SAFETY: same live mapping; the writable slice above has gone out of
         // scope, so flipping to PROT_NONE doesn't dangle any reference.
-        unsafe { region::protect(ptr, len, Protection::NONE)?; }
+        unsafe { region::protect(ptr, len, Protection::NONE).map_err(io_err)?; }
         Ok(Self { _lock, alloc })
     }
 
     /// Briefly flip to read-only, hand the bytes to `f`, then re-seal.
     /// `&mut self` so the borrow checker enforces the single-threaded use
     /// the prose talks about — concurrent calls would race the seal/unseal.
-    fn with_readable<R>(&mut self, f: impl FnOnce(&[u8]) -> R) -> std::io::Result<R> {
+    fn with_readable<R>(&mut self, f: impl FnOnce(&[u8]) -> R) -> io::Result<R> {
         // SAFETY: same live mapping; the returned guard restores PROT_NONE on drop.
         let _open = unsafe {
             region::protect_with_handle(
                 self.alloc.as_ptr::<u8>(),
                 self.alloc.len(),
                 Protection::READ,
-            )?
+            )
+            .map_err(io_err)?
         };
         // SAFETY: page is now PROT_READ for the duration of `_open`.
         let bytes = unsafe {
@@ -358,12 +365,11 @@ impl PageProtectedKey {
 impl Drop for PageProtectedKey {
     fn drop(&mut self) {
         // Re-open for writing so the wipe can land, then let _lock unlock and
-        // alloc unmap. (Custom Drop runs *before* the fields drop.)
+        // alloc unmap. Best-effort: if mprotect fails the program is already on
+        // its way out; the worst case is the page wasn't wiped before munmap
+        // reclaimed it.
         // SAFETY: same live mapping; we're about to write KEY_LEN bytes.
         unsafe {
-            // Result swallowed on purpose: if protect fails, the zeroize() call
-            // below SIGSEGVs the process during drop. Dying loudly is better
-            // than silently skipping the wipe and unmapping the page anyway.
             let _ = region::protect(
                 self.alloc.as_ptr::<u8>(),
                 self.alloc.len(),
@@ -400,7 +406,7 @@ The pattern itself isn't novel, and **if you're reaching for this in production,
 
 A couple of other crates worth knowing about in the same neighbourhood:
 
-- **[`memsec`](https://docs.rs/memsec)** — pure-Rust port of libsodium's `utils.c`, lower-level (free functions, no borrow-API). On Linux ≥ 5.14 it also exposes `memfd_secret(2)`, which is *strictly stronger* than `mlock`+`mprotect`: the kernel itself can no longer map the page, so even `/proc/<pid>/mem` and most kernel-side reads can't reach it. That's the natural sequel to this step.
+- **[`memsec`](https://docs.rs/memsec)** — pure-Rust port of libsodium's `utils.c`, lower-level (free functions, no borrow-API). Worth knowing about in the same space, though it doesn't expose `memfd_secret(2)`. That syscall (Linux ≥ 5.14) is *strictly stronger* than `mlock`+`mprotect`: the kernel itself can no longer map the page, so even `/proc/<pid>/mem` and most kernel-side reads can't reach it — a natural sequel to this step, but you'd call it via `libc::syscall` or a dedicated wrapper today.
 - **[`secmem-alloc`](https://crates.io/crates/secmem-alloc)** — different shape: a custom allocator you plug into `Box::new_in` / `Vec::new_in` so every allocation in a secret-bearing region gets `mlock` + zeroize-on-dealloc by default. No `mprotect` bracket, but a much lower per-key cost than a dedicated page.
 
 And then the one *not* to reach for here: **[`secrecy`](https://docs.rs/secrecy)** is explicitly *only* zeroize + a `Debug`-redacted `ExposeSecret` wrapper — no `mlock`, no `mprotect`, no `MADV_DONTDUMP`. It's a good ergonomic top-layer over any of the above, but it doesn't replace them.
