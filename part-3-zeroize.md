@@ -4,7 +4,7 @@
 
 1. **Part 1** — Wipe it (`zeroize`): move hazards, stack vs heap, register spills, Vec reallocation
 2. **Part 2** — Stop the OS from copying it: mlock, dumps, ptrace, page-isolated variant
-3. **Part 3** (new) — Keep it out of your process: `memfd_secret`, privilege separation, sandboxing (seccomp, Landlock). Demonstrable on any Linux box, no special hardware.
+3. **Part 3** (new) — "I Isolated My Secret. Or Did I?" — Keep it out of your process: `memfd_secret`, privilege separation, sandboxing (seccomp, Landlock). Demonstrable on any Linux box, no special hardware.
 4. **Part 4** (existing draft in `_posts/part-3-architecture.md`) — Keep it off your machine: kernel keyring, HSMs, KMS, MPC, TEEs
 
 ## Part 2 (OS hardening) — gaps to close
