@@ -396,7 +396,7 @@ The companion example includes a `live-page-protected` mode that lets you watch 
 
 A few honest things to note about this layer:
 
-- **It defends against bugs, not against a determined attacker.** The page is readable *exactly* when you're using the key — which is also when a deliberate attacker would catch you. The win is against *accidents*: stray pointers, OOB reads, an errant log statement.
+- **It defends against bugs, not against in-process attackers.** Any code running inside your process — a compromised dependency, an injected shared object, a supply-chain payload — shares your address space and can call `mprotect` itself to unseal the page whenever it likes, or simply wait for `with_readable` to open the window. The kernel enforces page permissions per-*process*, not per-library. The win here is against *accidents*: stray pointers, OOB reads, an errant log statement. Defending against malicious code in your own process requires keeping the key out of that process entirely — via privilege separation or hardware boundaries.
 - **The protection state is per-page and process-global.** That's why `with_readable` takes `&mut self`: two threads calling it on the same key would otherwise race — one's guard re-sealing the page to `PROT_NONE` while the other is still mid-read, SIGSEGVing the reader. `&mut self` forces the borrow checker to serialize calls per key for you. And note the closure can still copy the bytes into its return value — the seal only protects the page, not whatever you carry out of it.
 - **You pay a whole page per key.** `region::alloc(32, ...)` rounds up to the system page size (typically 4 KiB). Fine for a handful of long-lived keys; very much not for thousands of short-lived ones.
 - **It doesn't help with the threats the earlier sections already covered.** Swap, core dumps, and `ptrace` all bypass page protections — the bytes-on-disk and bytes-via-tracer paths read the underlying memory regardless of `PROT_*` flags. The `region::lock` and `madvise_dontdump` calls inside `load` are still the load-bearing controls there; the `protect` toggle is *added* on top, not a replacement.
@@ -435,7 +435,7 @@ But every knob here quietly assumes the plaintext key is sitting in *your* proce
 - `rlimit` — <https://docs.rs/rlimit>
 - `prctl` — <https://docs.rs/prctl>
 - `secrets` — ergonomic Rust wrapper over libsodium's guarded allocation (`SecretBox` / `SecretVec`, the recommended way to use the page-isolated pattern in production) — <https://crates.io/crates/secrets>
-- `memsec` — a Rust port of libsodium's secure-allocation primitives; on Linux ≥ 5.14 also exposes `memfd_secret` — <https://docs.rs/memsec>
+- `memsec` — a Rust port of libsodium's secure-allocation primitives (`malloc`, `mlock`, `mprotect`, `memzero`) — <https://docs.rs/memsec>
 - `secmem-alloc` — secret-memory custom allocator for `Box::new_in` / `Vec::new_in` — <https://crates.io/crates/secmem-alloc>
 - `secrecy` — ergonomic `Secret<T>` / `ExposeSecret` (zeroize + `Debug` redaction *only* — no mlock/mprotect/MADV) — <https://docs.rs/secrecy>
 
