@@ -340,23 +340,23 @@ But every knob here quietly assumes the plaintext key is sitting in *your* proce
 
 **Crates**
 
-- `region` — cross-platform virtual memory: `alloc`, `lock`, `protect`, `query` — https://docs.rs/region
-- `os-memlock` — mlock + MADV_DONTDUMP — https://docs.rs/os-memlock
-- `rlimit` — https://docs.rs/rlimit
-- `prctl` — https://docs.rs/prctl
-- `secrets` — ergonomic Rust wrapper over libsodium's guarded allocation (`SecretBox` / `SecretVec`, the recommended way to use the Step 6 pattern in production) — https://crates.io/crates/secrets
-- `memsec` — a Rust port of libsodium's secure-allocation primitives; on Linux ≥ 5.14 also exposes `memfd_secret` — https://docs.rs/memsec
-- `secmem-alloc` — secret-memory custom allocator for `Box::new_in` / `Vec::new_in` — https://crates.io/crates/secmem-alloc
-- `secrecy` — ergonomic `Secret<T>` / `ExposeSecret` (zeroize + `Debug` redaction *only* — no mlock/mprotect/MADV) — https://docs.rs/secrecy
+- `region` — cross-platform virtual memory: `alloc`, `lock`, `protect`, `query` — <https://docs.rs/region>
+- `os-memlock` — mlock + MADV_DONTDUMP — <https://docs.rs/os-memlock>
+- `rlimit` — <https://docs.rs/rlimit>
+- `prctl` — <https://docs.rs/prctl>
+- `secrets` — ergonomic Rust wrapper over libsodium's guarded allocation (`SecretBox` / `SecretVec`, the recommended way to use the Step 6 pattern in production) — <https://crates.io/crates/secrets>
+- `memsec` — a Rust port of libsodium's secure-allocation primitives; on Linux ≥ 5.14 also exposes `memfd_secret` — <https://docs.rs/memsec>
+- `secmem-alloc` — secret-memory custom allocator for `Box::new_in` / `Vec::new_in` — <https://crates.io/crates/secmem-alloc>
+- `secrecy` — ergonomic `Secret<T>` / `ExposeSecret` (zeroize + `Debug` redaction *only* — no mlock/mprotect/MADV) — <https://docs.rs/secrecy>
 
 **Kernel and libc docs**
 
-- `core(5)` — https://man7.org/linux/man-pages/man5/core.5.html
-- `mlock(2)` — https://man7.org/linux/man-pages/man2/mlock.2.html
-- `madvise(2)` — https://man7.org/linux/man-pages/man2/madvise.2.html
-- `mprotect(2)` — https://man7.org/linux/man-pages/man2/mprotect.2.html
-- `prctl(2)` — https://man7.org/linux/man-pages/man2/prctl.2.html
-- `ptrace(2)` — https://man7.org/linux/man-pages/man2/ptrace.2.html
-- `memfd_secret(2)` — Linux ≥ 5.14, kernel-level secret memory beyond what `mlock`/`mprotect` reach — https://man7.org/linux/man-pages/man2/memfd_secret.2.html
-- Yama / `ptrace_scope` — https://docs.kernel.org/admin-guide/LSM/Yama.html
-- libsodium guarded heap allocation (the production-grade version of Step 6, with guard pages and a canary) — https://doc.libsodium.org/memory_management · source: [`src/libsodium/sodium/utils.c`](https://github.com/jedisct1/libsodium/blob/master/src/libsodium/sodium/utils.c) (`sodium_malloc` / `sodium_mprotect_noaccess` / `sodium_mprotect_readonly` / `sodium_mprotect_readwrite`)
+- `core(5)` — <https://man7.org/linux/man-pages/man5/core.5.html>
+- `mlock(2)` — <https://man7.org/linux/man-pages/man2/mlock.2.html>
+- `madvise(2)` — <https://man7.org/linux/man-pages/man2/madvise.2.html>
+- `mprotect(2)` — <https://man7.org/linux/man-pages/man2/mprotect.2.html>
+- `prctl(2)` — <https://man7.org/linux/man-pages/man2/prctl.2.html>
+- `ptrace(2)` — <https://man7.org/linux/man-pages/man2/ptrace.2.html>
+- `memfd_secret(2)` — Linux ≥ 5.14, kernel-level secret memory beyond what `mlock`/`mprotect` reach — <https://man7.org/linux/man-pages/man2/memfd_secret.2.html>
+- Yama / `ptrace_scope` — <https://docs.kernel.org/admin-guide/LSM/Yama.html>
+- libsodium guarded heap allocation (the production-grade version of Step 6, with guard pages and a canary) — <https://doc.libsodium.org/memory_management> · source: [`src/libsodium/sodium/utils.c`](https://github.com/jedisct1/libsodium/blob/master/src/libsodium/sodium/utils.c) (`sodium_malloc` / `sodium_mprotect_noaccess` / `sodium_mprotect_readonly` / `sodium_mprotect_readwrite`)
