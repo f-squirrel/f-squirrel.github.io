@@ -9,7 +9,19 @@
 
 ## Part 2 (OS hardening) — gaps to close
 
-- **Explicitly call out the in-process attacker limit on `PageProtectedKey`.** The "defends against bugs, not against a determined attacker" bullet frames the weakness as a timing problem. The real issue is stronger: any code in the same process can call `mprotect` itself or wait for `with_readable`. Supply-chain attacks, injected `.so`, compromised dependencies — all run with the same page-table privileges. Worth a direct sentence.
+- ~~**Explicitly call out the in-process attacker limit on `PageProtectedKey`.**~~ Done (50b614e). Rewrote the "defends against bugs" bullet to name supply-chain attacks, explain why `mprotect` can't help (kernel enforces per-process), and point to privsep/hardware as the real answer.
+
+- ~~**Stale `memsec` / `memfd_secret` claim.**~~ Done (45a9787, 50b614e). Fixed in both the body and the "Further reading" section. `memsec` doesn't expose `memfd_secret`.
+
+- ~~**Orphaned "Steps 2 and 3" reference in `PageProtectedKey` code.**~~ Done (45a9787). Changed to "same controls as earlier."
+
+- ~~**Non-compiling `PageProtectedKey` code.**~~ Done (45a9787). Replaced with real code from examples (added `io_err` helper, `.map_err(io_err)?`).
+
+- ~~**Drop comment framing mismatch.**~~ Done (45a9787). Aligned with actual code's best-effort framing.
+
+- ~~**Drop-order explanation didn't acknowledge reversed field order.**~~ Done (45a9787). Rewritten to explain why `_lock` comes first in `PageProtectedKey` vs `bytes` first in `HardenedKey`.
+
+- ~~**Part 2 closing teased HSMs/TEEs instead of part 3.**~~ Done (9b8a4b5). Now teases privsep + kernel keyring.
 
 - **`memfd_secret(2)` deserves its own section, not a parenthetical.** It's the one Linux primitive that actually removes pages from the kernel's direct map — even `/proc/<pid>/mem` and most kernel-side reads can't reach them. Currently buried in the `memsec` bullet. No Rust crate wraps it yet; a raw `libc::syscall` example would be valuable.
 
