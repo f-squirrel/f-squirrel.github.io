@@ -57,7 +57,7 @@ A few mechanical details about `mlock` worth pinning down, because they change h
 That's where the [`region`](https://docs.rs/region) crate comes in. It's worth being precise about what it actually is, because its [own docs](https://docs.rs/region/) describe it as a *cross-platform virtual memory API*, not an `mlock` library. It wraps a whole family of platform primitives:
 
 | `region` API | Unix | Windows | What it does |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `region::query` | `/proc/self/maps` | `VirtualQuery` | inspect a memory region |
 | `region::alloc` | `mmap` | `VirtualAlloc` | reserve/commit pages |
 | `region::protect` | `mprotect` | `VirtualProtect` | change R/W/X permissions |
@@ -204,6 +204,88 @@ For a server: pair `ptrace_scope=1` with the `PR_SET_DUMPABLE` call from above, 
 
 The honest caveat, same as always: none of this stops a root / `CAP_SYS_PTRACE` attacker, who can lift any of these. What it does is raise the bar a lot against the realistic same-user case — and that's most of the value.
 
+## Trying it
+
+The companion example ([`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening)) ships with demo modes that exercise each control and the same `/proc/<pid>/mem` scanner from part 1. The [`README`](https://github.com/f-squirrel/f-squirrel.github.io/blob/master/examples/zeroize-os-hardening/README.md) has the full walkthrough, including two one-time system changes needed to reproduce the demos below: setting `core_pattern` to write core files locally (instead of piping to `apport` or `systemd-coredump`) and temporarily lowering `ptrace_scope` to `0` so the unhardened same-user scan actually succeeds. The highlights:
+
+**Core dumps.** Without hardening, crashing dumps the secret to disk:
+
+```text
+$ cargo run --release -- crash
+UNHARDENED: key loaded (checksum 0x00000000000019c0), PID 54321
+Aborting — check for core.54321 afterwards.
+Aborted (core dumped)
+
+$ python3 scan_core.py core.54321
+  hit at offset 0x3deaf0
+Found 1 occurrence(s) of the 32-byte DEADBEEF pattern
+```
+
+With `harden_process()` — `RLIMIT_CORE = 0` plus `PR_SET_DUMPABLE = 0` — no core file is produced at all:
+
+```text
+$ cargo run --release -- crash-hardened
+HARDENED: key loaded (checksum 0x00000000000019c0), PID 54322
+Aborting — check for core.54322 afterwards.
+Aborted
+
+$ ls core.54322
+ls: cannot access 'core.54322': No such file or directory
+```
+
+**Same-user memory scan.** With `ptrace_scope = 0` (classic), a same-user process can walk `/proc/<pid>/mem` for the DEADBEEF pattern — exactly the `scan_mem.py` attack from part 1:
+
+```text
+# Terminal 1
+$ cargo run --release -- live
+Process NOT hardened.
+
+=== UNHARDENED: key is LIVE (checksum 0x00000000000019c0) ===
+PID 55000
+  VmLck:         4 kB
+
+# Terminal 2 (same user, no sudo)
+$ python3 scan_mem.py 55000
+  hit at 0x564a3e800ae0 in [heap]
+Found 1 occurrence(s) of the 32-byte DEADBEEF pattern in PID 55000
+```
+
+That `VmLck: 4 kB` line confirms `mlock` did its job — one page is pinned and won't be swapped. But the secret is still visible to any same-user process that reads our memory.
+
+After `harden_process()`, the same scan gets shut out:
+
+```text
+# Terminal 1
+$ cargo run --release -- live-hardened
+Process hardened (RLIMIT_CORE=0, PR_SET_DUMPABLE=0).
+
+=== HARDENED: key is LIVE (checksum 0x00000000000019c0) ===
+PID 55001
+  VmLck:         4 kB
+
+# Terminal 2 (same user, no sudo)
+$ python3 scan_mem.py 55001
+Permission denied reading /proc/55001/maps
+(Process is likely non-dumpable — PR_SET_DUMPABLE is off.)
+```
+
+**Root still walks right through.** Against the same hardened process:
+
+```text
+$ sudo python3 scan_mem.py 55001
+  hit at 0x564a3e800ae0 in [heap]
+Found 1 occurrence(s) of the 32-byte DEADBEEF pattern in PID 55001
+```
+
+Five syscalls, and root reads the key in one line. What we've closed is the *same-user, non-root* window — which is most of the realistic threat surface for a compromised dependency or a nosy co-tenant.
+
+**After drop, the secret is gone.** Once the `live` or `live-hardened` process prints "key DROPPED," scanning again confirms `Zeroizing` did its job:
+
+```text
+$ sudo python3 scan_mem.py 55001
+Found 0 occurrence(s) of the 32-byte DEADBEEF pattern in PID 55001
+```
+
 ## Going further: a page-isolated variant
 
 Every step above has been about *external* threats — the OS paging memory out, the kernel dumping it on a crash, another process attaching. There's one more category worth knowing about: a stray pointer, out-of-bounds read, or use-after-free *in your own code* that accidentally reads the secret's bytes. The control for that is `mprotect(PROT_NONE)`: deny every access to the page when the key isn't actively in use, so any stray touch SIGSEGVs instead of silently picking up the bytes.
@@ -323,7 +405,7 @@ And then the one *not* to reach for here: **[`secrecy`](https://docs.rs/secrecy)
 
 The reason all of this is tucked behind *"going further"* rather than the recommended baseline is the threat-model shift: it's a tool for a different problem than the rest of this post.
 
-A working version of both `HardenedKey` and `PageProtectedKey` (with the real `unsafe { ... }` blocks the `region` crate's `protect` API actually requires, and pinned crate versions) is in [`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening). `cargo run --release` should print two matching checksums.
+A working version of both `HardenedKey` and `PageProtectedKey` (with the real `unsafe { ... }` blocks the `region` crate's `protect` API actually requires, and pinned crate versions) is in [`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening). `cargo run --release` prints two matching checksums; the `live`, `live-hardened`, `crash`, and `crash-hardened` modes run the demos from "Trying it" above.
 
 ## Where this leaves us
 
