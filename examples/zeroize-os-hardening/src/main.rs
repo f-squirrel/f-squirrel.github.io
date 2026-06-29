@@ -117,8 +117,7 @@ pub struct PageProtectedKey {
 impl PageProtectedKey {
     pub fn load(init: impl FnOnce(&mut [u8])) -> io::Result<Self> {
         // Whole page, initially writable so we can fill it.
-        let mut alloc =
-            region::alloc(KEY_LEN, Protection::READ_WRITE).map_err(io_err)?;
+        let mut alloc = region::alloc(KEY_LEN, Protection::READ_WRITE).map_err(io_err)?;
         let ptr: *const u8 = alloc.as_ptr::<u8>();
         let len: usize = alloc.len(); // page-rounded (typically 4096)
 
@@ -132,9 +131,8 @@ impl PageProtectedKey {
         // Fill in the secret through the only window we'll allow.
         // SAFETY: alloc is page-rounded and at least KEY_LEN bytes.
         {
-            let bytes = unsafe {
-                std::slice::from_raw_parts_mut(alloc.as_mut_ptr::<u8>(), KEY_LEN)
-            };
+            let bytes =
+                unsafe { std::slice::from_raw_parts_mut(alloc.as_mut_ptr::<u8>(), KEY_LEN) };
             init(bytes);
         }
 
@@ -164,8 +162,7 @@ impl PageProtectedKey {
             .map_err(io_err)?
         };
         // SAFETY: page is now PROT_READ for the duration of `_open`.
-        let bytes =
-            unsafe { std::slice::from_raw_parts(self.alloc.as_ptr::<u8>(), KEY_LEN) };
+        let bytes = unsafe { std::slice::from_raw_parts(self.alloc.as_ptr::<u8>(), KEY_LEN) };
         Ok(f(bytes))
     }
 }
@@ -183,8 +180,7 @@ impl Drop for PageProtectedKey {
                 self.alloc.len(),
                 Protection::READ_WRITE,
             );
-            let bytes =
-                std::slice::from_raw_parts_mut(self.alloc.as_mut_ptr::<u8>(), KEY_LEN);
+            let bytes = std::slice::from_raw_parts_mut(self.alloc.as_mut_ptr::<u8>(), KEY_LEN);
             bytes.zeroize();
         }
     }
@@ -210,7 +206,9 @@ fn load_demo_key(buf: &mut [u8]) {
 /// Stand in for a real crypto operation. The compiler can't elide the read
 /// because the checksum is observed.
 fn fake_sign(bytes: &[u8]) -> u64 {
-    bytes.iter().fold(0u64, |acc, &b| acc.wrapping_add(b as u64))
+    bytes
+        .iter()
+        .fold(0u64, |acc, &b| acc.wrapping_add(b as u64))
 }
 
 fn sleep(secs: u64) {
@@ -245,9 +243,7 @@ fn run_checksums() -> io::Result<()> {
         println!("  checksum = 0x{sum:016x}");
     }
 
-    println!(
-        "=== PageProtectedKey (region::alloc + mlock + MADV_DONTDUMP + mprotect) ==="
-    );
+    println!("=== PageProtectedKey (region::alloc + mlock + MADV_DONTDUMP + mprotect) ===");
     {
         let mut key = PageProtectedKey::load(load_demo_key)?;
         let sum = key.with_readable(fake_sign)?;
