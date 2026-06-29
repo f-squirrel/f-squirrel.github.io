@@ -386,22 +386,7 @@ let sig = key.with_readable(|bytes| sign(bytes, &digest))?;
 // page is PROT_NONE again until the next call.
 ```
 
-The `live-page-protected` demo mode in the companion example lets you watch the bracket in action. While the page is sealed (`PROT_NONE`), the scanner reads `/proc/<pid>/maps`, sees `---p`, and skips the region — finding nothing:
-
-```text
-# page sealed
-$ python3 scan_mem.py 2705892
-Found 0 occurrence(s) of the 32-byte DEADBEEF pattern in PID 2705892
-
-# page briefly unsealed to PROT_READ inside with_readable
-$ python3 scan_mem.py 2705892
-  hit at 0x76517a984000 in (anonymous)
-Found 1 occurrence(s) of the 32-byte DEADBEEF pattern in PID 2705892
-
-# page re-sealed
-$ python3 scan_mem.py 2705892
-Found 0 occurrence(s) of the 32-byte DEADBEEF pattern in PID 2705892
-```
+The companion example includes a `live-page-protected` mode that lets you watch the bracket in action — scanning at each phase to see the page appear and disappear from `/proc/<pid>/maps`.
 
 A few honest things to note about this layer:
 
