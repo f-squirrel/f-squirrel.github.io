@@ -51,3 +51,7 @@ bundle: ## Install dependencies
 .PHONY: build-image
 build-image: ## Build image
 	docker build -t ${IMAGE_NAME} .
+
+.PHONY: gen-stats
+gen-stats: ## Generate popular posts from Google Search Console CSV
+	python3 scripts/generate_popular_posts.py csv/Pages.csv

@@ -1,0 +1,9 @@
+- title: "VS Code with dockerized build environments for C/C++ projects"
+  url: "/dockerized-cpp-build-with-vscode/"
+  clicks: 978
+- title: "Configuring core dumps in docker"
+  url: "/how-to-configure-core-dump-in-docker-container/"
+  clicks: 965
+- title: "std::shared_ptr is an anti-pattern"
+  url: "/shared-ptr-is-evil/"
+  clicks: 882
