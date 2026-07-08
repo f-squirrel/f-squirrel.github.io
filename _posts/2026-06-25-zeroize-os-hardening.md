@@ -1,5 +1,5 @@
 ---
-title: "I Hardened My Secret. Or Did I?"
+title: "Secrets in Memory: More Exposed Than You Think"
 subtitle: "Where `zeroize` stops: keeping keys out of swap, dumps, and other processes"
 published: true
 permalink: "/zeroize-os-hardening"
