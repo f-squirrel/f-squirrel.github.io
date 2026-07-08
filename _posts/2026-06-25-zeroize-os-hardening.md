@@ -237,7 +237,7 @@ $ ls core.2703885
 ls: cannot access 'core.2703885': No such file or directory
 ```
 
-**Same-user memory scan.** This one needs a caveat up front, so you don't over-read the result: on a stock modern box `ptrace_scope` defaults to `1`, which *already* blocks a non-parent same-user process from reading `/proc/<pid>/mem` — so the unhardened process below is not as wide open as the demo makes it look. To make the attack visible at all, the README has you temporarily lower `ptrace_scope` to `0`. With that in place, a same-user process can walk `/proc/<pid>/mem` for the DEADBEEF pattern — exactly the `scan_mem.py` attack from part 1:
+**Same-user memory scan.** One caveat first: a stock box defaults to `ptrace_scope=1`, which *already* blocks a non-parent same-user process from reading `/proc/<pid>/mem` — the unhardened process below isn't as exposed as this looks. The README lowers it to `0` so the attack is visible at all. With that in place, a same-user process can walk `/proc/<pid>/mem` for the DEADBEEF pattern — the `scan_mem.py` attack from part 1:
 
 ```text
 # Terminal 1
