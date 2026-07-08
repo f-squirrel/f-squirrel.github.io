@@ -69,8 +69,8 @@ For our purposes — keeping a secret out of swap — the one we care about is `
 use zeroize::Zeroizing;
 
 let mut key = Box::new(Zeroizing::new([0u8; 32]));
-load_key_into(&mut key);
-let _lock = region::lock(key.as_ptr(), key.len())?;
+let _lock = region::lock(key.as_ptr(), key.len())?;  // pin the zeroed page first…
+load_key_into(&mut key);                             // …then fill it, into locked memory
 // pages stay resident until `_lock` drops, which calls munlock/VirtualUnlock
 ```
 
@@ -84,6 +84,7 @@ A couple of honest heads-ups, because `mlock` has sharp edges:
 
 - **It can silently fail.** A process may only lock up to its `RLIMIT_MEMLOCK` limit (`ulimit -l`), which on many systemd setups is a modest few megabytes. Go over it and `mlock` returns `ENOMEM`. So check the return value — a "locked" buffer that didn't actually lock is worse than knowing you couldn't. You can read or raise the limit (within your hard cap) with the `rlimit` crate.
 - **It stops swapping, not hibernation.** Suspend-to-disk snapshots *all* of RAM — locked pages included — into the hibernation image. Covering that means an encrypted hibernation image or no hibernation at all; it isn't something your process can fix on its own.
+- **On a swapless host it's a no-op — but a harmless one.** Plenty of servers and containers run with no disk swap at all, or only compressed `zram` that never touches disk; there, `mlock`'s swap protection buys nothing. It's cheap insurance where swap *does* exist and costs nothing where it doesn't — just don't read "I called `mlock`" as "my secret can't reach disk," because hibernation (above) still can.
 - **Windows differs.** `VirtualLock` keeps pages in the working set, but the working-set model has its own quirks; treat the cross-platform wrapper as best-effort and test on each target.
 
 ## Keep it out of core dumps
@@ -130,9 +131,12 @@ struct HardenedKey {
 impl HardenedKey {
     fn load(init: impl FnOnce(&mut [u8; 32])) -> std::io::Result<Self> {
         let mut bytes = Box::new(Zeroizing::new([0u8; 32]));
-        init(&mut bytes);
         let (ptr, len) = (bytes.as_ptr(), bytes.len());
-        let lock = region::lock(ptr, len)?;   // pin: no swap
+        // Pin the (zeroed) page *before* writing the secret, so the key bytes
+        // never sit in swappable memory even briefly. (`io_err` maps
+        // region::Error into io::Error — a one-liner shown in the example.)
+        let lock = region::lock(ptr, len).map_err(io_err)?;  // pin: no swap
+        init(&mut bytes);                                    // fill in place, into locked memory
         // NOTE: no per-buffer MADV_DONTDUMP here — the Box isn't page-aligned.
         // For this buffer, dump coverage comes from harden_process().
         Ok(Self { bytes, _lock: lock })
@@ -142,7 +146,7 @@ impl HardenedKey {
 
 What this earns us:
 
-- **Field-order drop semantics.** Rust drops a struct's fields in declaration order. By putting `bytes` first and `_lock` second, the `Zeroizing` wipe runs *while* the page is still locked — so the wipe lands on resident memory, not on memory the kernel just paged out under our feet. (Reversing the field order would be a quiet bug.)
+- **Field-order drop semantics — with an honest caveat.** Rust drops a struct's fields in declaration order, so `bytes` (first) is wiped before `_lock` (second) releases the pin. For `HardenedKey` this is tidiness more than safety: `munlock` doesn't evict the page, and the `Box` stays mapped until it drops last, so the `Zeroizing` wipe lands on the same resident bytes whichever order you pick. Keep `bytes` first as a clean default — but note that field order stops being cosmetic in `PageProtectedKey` below, where `munlock` genuinely *must* precede `munmap`, and reversing it really is a bug.
 - **You can't accidentally leak one of the two.** Bytes and lock are wired together — there's no path where one outlives the other or gets forgotten on an early return.
 - **The move hazard from part 1 is genuinely gone.** Moving a `HardenedKey` moves the `Box` pointer and the `LockGuard` handle, not the 32 bytes; the heap allocation stays put, and the lock keeps pointing at the same page.
 

@@ -74,15 +74,19 @@ pub struct HardenedKey {
 impl HardenedKey {
     pub fn load(init: impl FnOnce(&mut [u8; KEY_LEN])) -> io::Result<Self> {
         let mut bytes = Box::new(Zeroizing::new([0u8; KEY_LEN]));
-        init(&mut bytes);
 
         let ptr: *const u8 = bytes.as_ptr();
         let len: usize = bytes.len();
 
         // mlock is fine on a heap Box: Linux rounds the address down to the
         // page boundary internally. So this pins the (whole) page our 32-byte
-        // secret happens to live on.
+        // secret happens to live on. Pin *before* writing the secret, so the key
+        // bytes never sit in swappable memory even briefly — the same
+        // "prepare the slot, then fill it" discipline part 1 used on the stack.
         let lock = region::lock(ptr, len).map_err(io_err)?;
+
+        // Fill the now-pinned page in place.
+        init(&mut bytes);
 
         // NOTE: We don't call madvise(MADV_DONTDUMP) here. The kernel
         // requires the address to be page-aligned, and `Box`'s allocator
