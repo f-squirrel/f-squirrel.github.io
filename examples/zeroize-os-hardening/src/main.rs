@@ -40,21 +40,50 @@ const KEY_LEN: usize = 32;
 // Process-level hardening.
 // --------------------------------------------------------------------------
 
-fn harden_process() {
+/// Which of `harden_process()`'s controls actually took effect. A caller
+/// should only claim "hardened" if both are `true` — logging a failure isn't
+/// enough on its own, since a printed label that says "hardened" regardless
+/// is a false-positive success state for hardening code.
+struct HardenStatus {
+    core_dumps_disabled: bool,
+    non_dumpable: bool,
+}
+
+impl HardenStatus {
+    fn fully_hardened(&self) -> bool {
+        self.core_dumps_disabled && self.non_dumpable
+    }
+}
+
+fn harden_process() -> HardenStatus {
     // Best-effort: a startup hardening helper shouldn't refuse to run because
     // a container's seccomp profile forbids one syscall. But log every
-    // failure so a hardened-looking process can't quietly be a soft target.
+    // failure, and report status back to the caller, so a hardened-looking
+    // process can't quietly be a soft target.
 
     // Disable core dumps (soft = hard = 0). systemd-coredump can ignore this
     // by piping crashes, which is exactly what the next call quiets.
-    if let Err(e) = rlimit::setrlimit(rlimit::Resource::CORE, 0, 0) {
-        eprintln!("warn: failed to disable core dumps: {e}");
-    }
+    let core_dumps_disabled = match rlimit::setrlimit(rlimit::Resource::CORE, 0, 0) {
+        Ok(()) => true,
+        Err(e) => {
+            eprintln!("warn: failed to disable core dumps: {e}");
+            false
+        }
+    };
 
     // PR_SET_DUMPABLE = 0 makes the process non-dumpable (the systemd path
     // honours this) and as a bonus blocks ptrace attach by non-root callers.
-    if let Err(e) = prctl::set_dumpable(false) {
-        eprintln!("warn: failed to mark process non-dumpable: {e}");
+    let non_dumpable = match prctl::set_dumpable(false) {
+        Ok(()) => true,
+        Err(e) => {
+            eprintln!("warn: failed to mark process non-dumpable: {e}");
+            false
+        }
+    };
+
+    HardenStatus {
+        core_dumps_disabled,
+        non_dumpable,
     }
 }
 
@@ -118,6 +147,27 @@ pub struct PageProtectedKey {
     alloc: region::Allocation,
 }
 
+/// Zeroes `len` bytes at `ptr` on drop. Used only to cover the unwind path in
+/// `PageProtectedKey::load` where an early return happens before `Self` is
+/// constructed — a panic in `init`, or a failed `region::protect` call.
+/// `mem::forget`'d once the buffer is sealed and construction is about to
+/// succeed. Must only ever *drop* while the mapping is still writable —
+/// forgetting it right before returning `Ok` is what guarantees that.
+struct WipeGuard {
+    ptr: *mut u8,
+    len: usize,
+}
+
+impl Drop for WipeGuard {
+    fn drop(&mut self) {
+        // SAFETY: only alive while `alloc` in `load` still owns a live,
+        // writable mapping of at least `len` bytes at `ptr`.
+        unsafe {
+            std::slice::from_raw_parts_mut(self.ptr, self.len).zeroize();
+        }
+    }
+}
+
 impl PageProtectedKey {
     pub fn load(init: impl FnOnce(&mut [u8])) -> io::Result<Self> {
         // Whole page, initially writable so we can fill it.
@@ -132,6 +182,15 @@ impl PageProtectedKey {
             os_memlock::madvise_dontdump(ptr as *mut c_void, len)?;
         }
 
+        // Guard against `init` panicking before `Self` exists: without this,
+        // an early unwind would drop `lock` then `alloc` (munmap) without
+        // ever wiping whatever partial secret `init` had already written.
+        // Declared after `lock` so it unwinds *before* `lock`/`alloc` do.
+        let wipe_on_unwind = WipeGuard {
+            ptr: alloc.as_mut_ptr::<u8>(),
+            len: KEY_LEN,
+        };
+
         // Fill in the secret through the only window we'll allow.
         // SAFETY: alloc is page-rounded and at least KEY_LEN bytes.
         {
@@ -140,13 +199,20 @@ impl PageProtectedKey {
             init(bytes);
         }
 
-        // Seal: no access until something deliberately opens it.
+        // Seal: no access until something deliberately opens it. Note the
+        // guard is still armed here — if this `protect` call fails, `?`
+        // returns early and `wipe_on_unwind` still wipes before `lock`/
+        // `alloc` release the page.
         // SAFETY: `ptr`/`len` describe the same live mapping; the slice from
         // above has gone out of scope, so flipping to PROT_NONE doesn't
         // dangle any reference.
         unsafe {
             region::protect(ptr, len, Protection::NONE).map_err(io_err)?;
         }
+
+        // Sealed and about to be constructed — `PageProtectedKey::drop` owns
+        // the wipe path from here, so disarm the unwind guard.
+        std::mem::forget(wipe_on_unwind);
 
         Ok(Self { _lock: lock, alloc })
     }
@@ -174,18 +240,23 @@ impl PageProtectedKey {
 impl Drop for PageProtectedKey {
     fn drop(&mut self) {
         // Re-open writable so the wipe can land, then let `_lock` munlock
-        // and `alloc` munmap. Best-effort: if mprotect fails the program is
-        // already on its way out; the worst case is the page wasn't wiped
-        // before munmap reclaimed it.
-        // SAFETY: same live mapping; we're about to write KEY_LEN bytes.
+        // and `alloc` munmap. Best-effort: if mprotect fails, the page may
+        // still be PROT_NONE, and writing through it would SIGSEGV during
+        // Drop — so only wipe if reopening actually succeeded. The worst
+        // case then is the page wasn't wiped before munmap reclaimed it,
+        // not a crash.
+        // SAFETY: same live mapping; we only write if `protect` reports success.
         unsafe {
-            let _ = region::protect(
+            let reopened = region::protect(
                 self.alloc.as_ptr::<u8>(),
                 self.alloc.len(),
                 Protection::READ_WRITE,
-            );
-            let bytes = std::slice::from_raw_parts_mut(self.alloc.as_mut_ptr::<u8>(), KEY_LEN);
-            bytes.zeroize();
+            )
+            .is_ok();
+            if reopened {
+                let bytes = std::slice::from_raw_parts_mut(self.alloc.as_mut_ptr::<u8>(), KEY_LEN);
+                bytes.zeroize();
+            }
         }
     }
 }
@@ -238,7 +309,7 @@ fn print_vmlck(pid: u32) {
 
 /// Default: run both key types, print matching checksums.
 fn run_checksums() -> io::Result<()> {
-    harden_process();
+    let _ = harden_process();
 
     println!("=== HardenedKey (Box + mlock) ===");
     {
@@ -264,8 +335,15 @@ fn run_live(harden: bool) -> io::Result<()> {
     let label = if harden { "HARDENED" } else { "UNHARDENED" };
 
     if harden {
-        harden_process();
-        println!("Process hardened (RLIMIT_CORE=0, PR_SET_DUMPABLE=0).");
+        let status = harden_process();
+        if status.fully_hardened() {
+            println!("Process hardened (RLIMIT_CORE=0, PR_SET_DUMPABLE=0).");
+        } else {
+            println!(
+                "Process hardening attempted (core_dumps_disabled={}, non_dumpable={}) — not fully hardened.",
+                status.core_dumps_disabled, status.non_dumpable
+            );
+        }
     } else {
         println!("Process NOT hardened.");
     }
@@ -347,11 +425,20 @@ fn run_live_page_protected() -> io::Result<()> {
 
 /// Load key and abort immediately — produces a core dump (if enabled).
 fn run_crash(harden: bool) -> io::Result<()> {
-    let label = if harden { "HARDENED" } else { "UNHARDENED" };
-
-    if harden {
-        harden_process();
-    }
+    let label = if harden {
+        let status = harden_process();
+        if status.fully_hardened() {
+            "HARDENED"
+        } else {
+            eprintln!(
+                "warn: not fully hardened (core_dumps_disabled={}, non_dumpable={})",
+                status.core_dumps_disabled, status.non_dumpable
+            );
+            "HARDENING_ATTEMPTED"
+        }
+    } else {
+        "UNHARDENED"
+    };
 
     let key = HardenedKey::load(|buf| load_demo_key(buf))?;
     let sum = fake_sign(key.as_bytes());
