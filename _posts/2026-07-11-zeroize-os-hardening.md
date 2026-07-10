@@ -16,7 +16,7 @@ There are really three things the OS can do with a secret sitting in your RAM, a
 2. **write it into a core dump** when you crash,
 3. **hand it to another process** that reads your live memory.
 
-Rather than touring the three controls separately, let's build a hardened key buffer one piece at a time — adding each control only when the previous version is missing something — and then harden the process around it. By the end we'll have a small `HardenedKey` type and a one-shot `harden_process()` call, plus a page-isolated variant for a different threat model in the "going further" coda.
+Rather than touring the three controls separately, let's build a hardened key buffer one piece at a time — adding each control only when the previous version is missing something — and then harden the process around it. By the end we'll have a small `HardenedKey` type and a one-shot `harden_process()` call. (A fourth concern — your *own* code reading the secret by accident — needs a different tool and gets the next post to itself.)
 
 ## Starting point: the heap `Box` from part 1
 
@@ -35,22 +35,13 @@ Within the language, that's solid: the secret lives at one fixed heap address, m
 
 What the heap `Box` does *not* touch is the operating system. Those 32 bytes still sit on an ordinary, pageable heap page, and the OS is free to copy that page somewhere `zeroize` will never follow: out to the swap file, into a core dump, or into another same-user process that reads your memory via `ptrace`. Closing those three gaps is the whole job of this post — and we'll do it one knob at a time, building up a small `HardenedKey` type as we go.
 
-## Lean on the stable address
-
-Everything below hangs on one property of that `Box`: its address doesn't move. The kernel controls we're about to reach for — `mlock` to pin the page, `madvise` to exclude it from dumps — all operate on a *specific address range*, and they'd be worse than useless if the bytes wandered off to a new location afterwards. Pin one page, then let the secret move to another, and you've locked an empty page while the live secret sits exposed.
-
-That's exactly why part 1's "allocate, then fill in place" shape matters here and not just as a tidiness point: it hands us a fixed heap address we can pin and protect, with no stack copy left over to leak first. The `HardenedKey::load` we arrive at below wraps that same pattern behind an `init` closure — but conceptually, the foundation is already in your hand the moment the secret is in a `Box`. So: `region::lock` pins this address — and it wouldn't survive if the bytes themselves moved. They don't — so we can build. (The `madvise` dump-exclusion control needs a page-aligned address, which a `Box` doesn't have; we come back to it once we've built one, in the page-isolated variant later.)
-
 ## Pin it in RAM so it can't be swapped
 
 A heap allocation is still pageable memory. The kernel might page your secret out to the swap file, leaving a copy sitting on disk long after the process is gone. The fix is `mlock(2)`: tell the kernel "don't swap these pages out."
 
-A few mechanical details about `mlock` worth pinning down, because they change how you call it:
+Note that `mlock` — like every kernel control in this post — operates on a *specific address range*. That's why part 1's "allocate, then fill in place" `Box` matters here and not just as a tidiness point: it hands us a fixed heap address that won't wander off after we pin it. Lock a stack array instead, let the value move, and you've pinned an empty page while the live secret sits on an unlocked one.
 
-- **It operates on whole pages.** `mlock(addr, len)` takes a byte range, but the kernel rounds it out to every page that range touches — typically 4 KiB each. You can't pin just 32 bytes; the kernel pins the page those 32 bytes live on, and if your secret straddles a page boundary, both pages get locked.
-- **There's a budget.** Locked memory counts against `RLIMIT_MEMLOCK` (`ulimit -l`). Exceed it and you get `ENOMEM` — the call doesn't half-succeed, but it also doesn't yell at you unless you check the return value.
-- **The undo is `munlock`.** Same signature, symmetric. Forget it and the pages stay locked for the lifetime of the process.
-- **Windows has a different name for the same idea.** `VirtualLock` keeps the region in the process's working set; `VirtualUnlock` releases it.
+Two mechanical details worth knowing before the first call: `mlock(addr, len)` takes a byte range but the kernel rounds it out to every page that range touches (typically 4 KiB each) — you can't pin just 32 bytes, and a secret straddling a page boundary locks both pages. And the undo is `munlock`, same signature; forget it and the pages stay locked for the lifetime of the process.
 
 `mlock` is a raw libc call. You *can* reach it from Rust via `libc::mlock` directly, but it's `unsafe`, platform-specific, and you have to remember the `munlock` yourself.
 
@@ -82,9 +73,9 @@ If you'd rather go lower-level, [`nix`](https://docs.rs/nix) gives you `nix::sys
 
 A couple of honest heads-ups, because `mlock` has sharp edges:
 
-- **It can silently fail.** A process may only lock up to its `RLIMIT_MEMLOCK` limit (`ulimit -l`), which on many systemd setups is a modest few megabytes. Go over it and `mlock` returns `ENOMEM`. So check the return value — a "locked" buffer that didn't actually lock is worse than knowing you couldn't. You can read or raise the limit (within your hard cap) with the `rlimit` crate.
+- **It can silently fail.** Locked memory counts against `RLIMIT_MEMLOCK` (`ulimit -l`), which on many systemd setups is a modest few megabytes. Go over it and `mlock` returns `ENOMEM` — the call doesn't half-succeed, but it also doesn't yell at you unless you check the return value. So check it: a "locked" buffer that didn't actually lock is worse than knowing you couldn't. You can read or raise the limit (within your hard cap) with the `rlimit` crate.
 - **It stops swapping, not hibernation.** Suspend-to-disk snapshots *all* of RAM — locked pages included — into the hibernation image. Covering that means an encrypted hibernation image or no hibernation at all; it isn't something your process can fix on its own.
-- **Locks don't survive `fork`.** Memory locks are not inherited by a child created via `fork(2)` — the child's copy-on-write copy of the secret page is *swappable*, even while the parent's stays pinned. Any dependency that spawns a subprocess the classic way (`fork` + `exec`) briefly duplicates your secret into an unlocked address space. So load keys *after* any daemonizing or forking setup, and treat "fork while a key is live" as a leak — or use the page-isolated variant later in this post, which can tell the kernel to hand the child a zero-filled page instead (`MADV_WIPEONFORK`).
+- **Locks don't survive `fork`.** Memory locks are not inherited by a child created via `fork(2)` — the child's copy-on-write copy of the secret page is *swappable*, even while the parent's stays pinned. Any dependency that spawns a subprocess the classic way (`fork` + `exec`) briefly duplicates your secret into an unlocked address space. So load keys *after* any daemonizing or forking setup, and treat "fork while a key is live" as a leak — or use the page-isolated variant in the next post, which can tell the kernel to hand the child a zero-filled page instead (`MADV_WIPEONFORK`).
 - **On a swapless host it buys less secrecy value.** Plenty of servers and containers run with no disk swap at all, or only compressed `zram` that never touches disk; there, `mlock`'s swap protection has no disk path to block. It still pins pages, consumes the `RLIMIT_MEMLOCK` budget, and can fail — so keep checking the return value — and it's cheap insurance where swap *does* exist. Just don't read "I called `mlock`" as "my secret can't reach disk," because hibernation (above) still can.
 - **Windows differs.** `VirtualLock` keeps pages in the working set, but the working-set model has its own quirks; treat the cross-platform wrapper as best-effort and test on each target.
 
@@ -98,10 +89,10 @@ Before we reach for it though, there's a *real* gotcha worth knowing — and it'
 
 That leaves two real options:
 
-1. **Defer per-region dump-exclusion until you have page-aligned memory.** That's what the page-isolated variant will give us, via `region::alloc`. Until then, dump coverage for the Box-based key comes from the process-wide `RLIMIT_CORE = 0` + `PR_SET_DUMPABLE` in "Harden the process around it."
+1. **Defer per-region dump-exclusion until you have page-aligned memory.** That's what the page-isolated variant in the next post gives us, via `region::alloc`. Until then, dump coverage for the Box-based key comes from the process-wide `RLIMIT_CORE = 0` + `PR_SET_DUMPABLE` in "Harden the process around it."
 2. **Round the pointer down to the page boundary and `madvise` the whole page.** It works, but you've now told the kernel to exclude *unrelated heap data* — whatever neighbouring allocations happen to share that page — from your own core dumps. The next time something crashes for a reason that has nothing to do with the secret, the data you'd want for the post-mortem is silently missing.
 
-The example pursues option 1 for the heap-Box buffer and option "do it for real" for the page-isolated variant. For completeness, the `madvise` call you'd make on a page-aligned region looks like this:
+The example pursues option 1 for the heap-Box buffer (and does the per-region call for real on the page-isolated buffer, next post). For completeness, the `madvise` call you'd make on a page-aligned region looks like this:
 
 ```rust
 // Only correct when `ptr` is a page-aligned address you own —
@@ -147,10 +138,10 @@ impl HardenedKey {
 
 What this earns us:
 
-- **Field-order drop semantics — with an honest caveat.** Rust drops a struct's fields in declaration order, so `bytes` (first) is wiped before `_lock` (second) releases the pin. For `HardenedKey` this is tidiness more than safety: `munlock` doesn't evict the page, and the `Box` stays mapped until it drops last, so the `Zeroizing` wipe lands on the same resident bytes whichever order you pick. Keep `bytes` first as a clean default — but note that field order stops being cosmetic in `PageProtectedKey` below, where `munlock` genuinely *must* precede `munmap`, and reversing it really is a bug. This ordering only covers the fully-constructed value, though: if `init` panics *before* `HardenedKey` exists, there's no `Self` yet for field order to apply to, so ordinary local-variable drop order takes over instead — `lock` (declared second, in `load`'s own locals) unwinds before `bytes`, meaning the page can be unlocked a moment before the wipe runs. Treat the closure as non-panicking, or add a construction-time guard if that unwind window matters to your threat model.
+- **Field-order drop semantics.** Rust drops a struct's fields in declaration order, so `bytes` (first) is wiped before `_lock` (second) releases the pin. For `HardenedKey` this is tidiness more than safety — `munlock` doesn't evict the page, and the `Box` stays mapped until it drops last — but keep `bytes` first as a clean default; the ordering becomes load-bearing in the page-isolated variant next post. (One corner case: if `init` panics before `Self` exists, field order doesn't apply — `load`'s locals unwind instead, and the page can be unlocked a moment before the wipe. Treat the closure as non-panicking, or add a construction-time wipe guard if that unwind window matters to your threat model.)
 - **You can't accidentally leak one of the two.** Bytes and lock are wired together — there's no path where one outlives the other or gets forgotten on an early return.
 - **The move hazard from part 1 is genuinely gone.** Moving a `HardenedKey` moves the `Box` pointer and the `LockGuard` handle, not the 32 bytes; the heap allocation stays put, and the lock keeps pointing at the same page.
-- **Locks don't stack, and the page isn't exclusively ours.** Linux tracks `mlock` as a `VM_LOCKED` bit on the VMA covering the (page-rounded) range, not a per-page refcount per caller — so if two `HardenedKey`s happen to land on the same heap page, dropping one can `munlock` the page while the other key is still live. The page may also hold allocator metadata or unrelated heap data that gets pinned along for the ride. That's an acceptable baseline cost for a *single* 32-byte key — but with a modern allocator packing small allocations, two keys sharing a page is the likely case, not a corner case, and the failure is silent: `VmLck` drops to zero and nothing in the program can tell. If your process holds more than one `HardenedKey` at a time, assume they collide, and use the page-isolated variant below (or the `secrets` crate) instead — there every key owns its page, so one key's unlock can't strip another's protection.
+- **Locks don't stack, and the page isn't exclusively ours.** Linux tracks `mlock` as a `VM_LOCKED` bit on the VMA covering the (page-rounded) range, not a per-page refcount per caller — so if two `HardenedKey`s happen to land on the same heap page, dropping one can `munlock` the page while the other key is still live. The page may also hold allocator metadata or unrelated heap data that gets pinned along for the ride. That's an acceptable baseline cost for a *single* 32-byte key — but with a modern allocator packing small allocations, two keys sharing a page is the likely case, not a corner case, and the failure is silent: `VmLck` drops to zero and nothing in the program can tell. If your process holds more than one `HardenedKey` at a time, assume they collide, and use the page-isolated variant from the next post (or the [`secrets`](https://crates.io/crates/secrets) crate) instead — there every key owns its page, so one key's unlock can't strip another's protection.
 
 (Types and crate versions are simplified — see [`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening) for a buildable version pinned to real crate versions.)
 
@@ -220,7 +211,7 @@ fn main() -> std::io::Result<()> {
 }
 ```
 
-A misconfigured environment now produces a process that *refuses to load the key*, instead of one that silently looks fine and isn't. Whether to fail closed like this or to warn and continue is a deployment-policy call — a batch job sitting behind three other layers of defence might reasonably log and carry on — but make that call deliberately, in one visible place. The shape to avoid is the accidental version: a warning line nobody reads followed by business as usual, which quietly downgrades your hardening to log-only in exactly the environments (restricted seccomp profiles, unusual containers) where you most wanted to know.
+A misconfigured environment now produces a process that *refuses to load the key*, instead of one that silently looks fine and isn't. Whether to fail closed or to warn and continue is a deployment-policy call — just make it deliberately, in one visible place, rather than drifting into a warning line nobody reads followed by business as usual.
 
 For a system-wide policy there's the Yama LSM, via `/proc/sys/kernel/yama/ptrace_scope`:
 
@@ -315,188 +306,14 @@ $ python3 scan_mem.py 2706794
 Found 0 occurrence(s) of the 32-byte DEADBEEF pattern in PID 2706794
 ```
 
-## Going further: a page-isolated variant
-
-Every step above has been about *external* threats — the OS paging memory out, the kernel dumping it on a crash, another process attaching. There's one more category worth knowing about: a stray pointer, out-of-bounds read, or use-after-free *in your own code* that accidentally reads the secret's bytes. The control for that is `mprotect(PROT_NONE)`: deny every access to the page when the key isn't actively in use, so any stray touch SIGSEGVs instead of silently picking up the bytes.
-
-The catch is that `mprotect` works at page granularity, and the heap `Box` from earlier shares its page with allocator metadata and neighbouring allocations — flipping the whole page to `PROT_NONE` would crash anything that touched a neighbour. To use `protect` safely you need a *dedicated* page. That's what `region::alloc` (the `mmap`/`VirtualAlloc` row of the table earlier) is for. Once you own a whole page, `region::lock`, `MADV_DONTDUMP`, *and* `region::protect` can all be applied to it cleanly.
-
-Drop-order discipline matters here too, but the field order is *reversed* from `HardenedKey` — and for good reason. `HardenedKey` puts `bytes` first so the `Zeroizing` wipe runs while the lock is still held. `PageProtectedKey` doesn't need that: it has a custom `Drop` that re-opens the page and wipes *before* any field drops. What matters after the custom `Drop` is that `_lock` (`munlock`) drops before `alloc` (`munmap`), so the unlock lands on still-mapped memory. That's why `_lock` comes first here. Reverse the field order and the unlock fires on a region that's already gone.
-
-```rust
-use std::ffi::c_void;
-use std::io;
-use region::Protection;
-use zeroize::Zeroize;
-
-const KEY_LEN: usize = 32;
-
-struct PageProtectedKey {
-    _lock: region::LockGuard,
-    alloc: region::Allocation, // dedicated, page-aligned; PROT_NONE at rest
-}
-
-fn io_err<E: std::fmt::Display>(e: E) -> io::Error {
-    io::Error::other(e.to_string())
-}
-
-/// Zeroes `len` bytes at `ptr` on drop. Covers any early return before
-/// `PageProtectedKey` is fully constructed — a panic in `init`, or a failed
-/// `region::protect` call — by wiping before `_lock`/`alloc` unwind. Only
-/// `mem::forget`'d once the page is sealed and construction is about to
-/// succeed, handing wipe duty back to `PageProtectedKey`'s own `Drop`.
-struct WipeGuard { ptr: *mut u8, len: usize }
-
-impl Drop for WipeGuard {
-    fn drop(&mut self) {
-        // SAFETY: only alive while `alloc` below still owns a live, writable
-        // mapping of at least `len` bytes at `ptr`.
-        unsafe { std::slice::from_raw_parts_mut(self.ptr, self.len).zeroize(); }
-    }
-}
-
-impl PageProtectedKey {
-    fn load(init: impl FnOnce(&mut [u8])) -> io::Result<Self> {
-        // 1. Whole page, initially writable so we can fill it.
-        let mut alloc = region::alloc(KEY_LEN, Protection::READ_WRITE)
-            .map_err(io_err)?;
-        let ptr: *const u8 = alloc.as_ptr::<u8>();
-        let len: usize = alloc.len(); // page-rounded (typically 4096)
-
-        // 2. Pin, exclude from dumps, and wipe-on-fork. The first two are the
-        //    same controls as earlier, just on a whole page instead of a
-        //    corner of one; the third is new — and only possible here, because
-        //    madvise needs the page-aligned address a Box can't give us.
-        let _lock = region::lock(ptr, len).map_err(io_err)?;
-        // SAFETY: ptr/len describe a live, owned, page-aligned mmap region.
-        unsafe { os_memlock::madvise_dontdump(ptr as *mut c_void, len)?; }
-        // Linux ≥ 4.14: a forked child sees this page zero-filled, so the
-        // secret never exists in any child address space. This matters because
-        // mlock is NOT inherited across fork(2) — a child's copy-on-write copy
-        // of the page would be swappable even while the parent's stays pinned.
-        // SAFETY: same live, owned, page-aligned mapping.
-        unsafe {
-            if libc::madvise(ptr as *mut c_void, len, libc::MADV_WIPEONFORK) != 0 {
-                return Err(io::Error::last_os_error());
-            }
-        }
-
-        // 2.5. Guard the unwind path: if `init` panics before `Self` exists,
-        // ordinary local drop order would unlock and unmap the page without
-        // ever wiping the partial secret it already holds. This guard runs
-        // first on unwind (it's the most recently declared local) and wipes
-        // before `_lock`/`alloc` let go of the page.
-        let wipe_on_unwind = WipeGuard { ptr: alloc.as_mut_ptr::<u8>(), len: KEY_LEN };
-
-        // 3. Write the secret in through the only window we'll allow.
-        // SAFETY: alloc is page-rounded and at least KEY_LEN bytes.
-        {
-            let bytes = unsafe {
-                std::slice::from_raw_parts_mut(alloc.as_mut_ptr::<u8>(), KEY_LEN)
-            };
-            init(bytes);
-        }
-
-        // 4. Seal: no access at all until something deliberately opens it.
-        // The guard is still armed here — if this call fails, `?` returns
-        // early and `wipe_on_unwind` still wipes before `_lock`/`alloc`
-        // release the page.
-        // SAFETY: same live mapping; the writable slice above has gone out of
-        // scope, so flipping to PROT_NONE doesn't dangle any reference.
-        unsafe { region::protect(ptr, len, Protection::NONE).map_err(io_err)?; }
-
-        // Sealed, construction about to succeed — disarm the guard now that
-        // `PageProtectedKey::drop` owns the wipe path.
-        std::mem::forget(wipe_on_unwind);
-        Ok(Self { _lock, alloc })
-    }
-
-    /// Briefly flip to read-only, hand the bytes to `f`, then re-seal.
-    /// `&mut self` so the borrow checker enforces the single-threaded use
-    /// the prose talks about — concurrent calls would race the seal/unseal.
-    fn with_readable<R>(&mut self, f: impl FnOnce(&[u8]) -> R) -> io::Result<R> {
-        // SAFETY: same live mapping; the returned guard restores PROT_NONE on drop.
-        let _open = unsafe {
-            region::protect_with_handle(
-                self.alloc.as_ptr::<u8>(),
-                self.alloc.len(),
-                Protection::READ,
-            )
-            .map_err(io_err)?
-        };
-        // SAFETY: page is now PROT_READ for the duration of `_open`.
-        let bytes = unsafe {
-            std::slice::from_raw_parts(self.alloc.as_ptr::<u8>(), KEY_LEN)
-        };
-        Ok(f(bytes))
-    }
-}
-
-impl Drop for PageProtectedKey {
-    fn drop(&mut self) {
-        // Re-open for writing so the wipe can land, then let _lock unlock and
-        // alloc unmap. Best-effort: if mprotect fails, the page may still be
-        // PROT_NONE, and writing through it would SIGSEGV during Drop — so we
-        // only wipe if reopening actually succeeded. The worst case is then
-        // that the page wasn't wiped before munmap reclaimed it, not a crash.
-        // SAFETY: same live mapping; we only write if `protect` reports success.
-        unsafe {
-            let reopened = region::protect(
-                self.alloc.as_ptr::<u8>(),
-                self.alloc.len(),
-                Protection::READ_WRITE,
-            )
-            .is_ok();
-            if reopened {
-                let bytes = std::slice::from_raw_parts_mut(
-                    self.alloc.as_mut_ptr::<u8>(), KEY_LEN,
-                );
-                bytes.zeroize();
-            }
-        }
-    }
-}
-```
-
-Usage follows the same bracket pattern libsodium uses with `sodium_mprotect_noaccess` / `sodium_mprotect_readonly`:
-
-```rust
-let mut key = PageProtectedKey::load(|buf| load_key_into(buf))?;
-let sig = key.with_readable(|bytes| sign(bytes, &digest))?;
-// page is PROT_NONE again until the next call.
-```
-
-The companion example includes a `live-page-protected` mode that lets you watch the bracket in action — scanning at each phase to see the mapping flip between `---p` and readable in `/proc/<pid>/maps`; the scanner skips the page while it's sealed, but the mapping itself never goes away.
-
-A few honest things to note about this layer:
-
-- **It defends against bugs, not against in-process attackers.** Any code running inside your process — a compromised dependency, an injected shared object, a supply-chain payload — shares your address space and can call `mprotect` itself to unseal the page whenever it likes, or simply wait for `with_readable` to open the window. The kernel enforces page permissions per-*process*, not per-library. The win here is against *accidents*: stray pointers, OOB reads, an errant log statement. Defending against malicious code in your own process requires keeping the key out of that process entirely — via privilege separation or hardware boundaries.
-- **The protection state is per-page and process-global.** That's why `with_readable` takes `&mut self`: two threads calling it on the same key would otherwise race — one's guard re-sealing the page to `PROT_NONE` while the other is still mid-read, SIGSEGVing the reader. `&mut self` forces the borrow checker to serialize calls per key for you. And note the closure can still copy the bytes into its return value — the seal only protects the page, not whatever you carry out of it.
-- **You pay a whole page per key.** `region::alloc(32, ...)` rounds up to the system page size (typically 4 KiB). Fine for a handful of long-lived keys; very much not for thousands of short-lived ones.
-- **It doesn't help with the threats the earlier sections already covered.** Swap, core dumps, and `ptrace` all bypass page protections — the bytes-on-disk and bytes-via-tracer paths read the underlying memory regardless of `PROT_*` flags. The `region::lock` and `madvise_dontdump` calls inside `load` are still the load-bearing controls there; the `protect` toggle is *added* on top, not a replacement.
-- **`harden_process()` still applies unchanged.** Per-key and process-level controls compose freely.
-
-The pattern itself isn't novel, and **if you're reaching for this in production, don't roll your own — use [`secrets`](https://crates.io/crates/secrets)**. It packages the same bracket (`PROT_NONE` at rest, `PROT_READ`/`PROT_WRITE` on borrow) behind an ergonomic Rust API (`SecretBox<T>` / `SecretVec<T>`), with protected borrows, guard pages, canaries, `mlock`, and zero-on-free that the hand-rolled version here doesn't have. Its docs describe it as mostly wrapping libsodium's memory-protection utilities, but the Rust API and the feature/build configuration are part of the guarantee too — not something inherited wholesale. The `PageProtectedKey` above is here to *show* the pattern, not to compete with it.
-
-A couple of other crates worth knowing about in the same neighbourhood:
-
-- **[`memsec`](https://docs.rs/memsec)** — pure-Rust port of libsodium's `utils.c`, lower-level (free functions, no borrow-API). Worth knowing about in the same space, though it doesn't expose `memfd_secret(2)`. That syscall (Linux ≥ 5.14) is a stronger Linux-specific primitive than `mlock`+`mprotect`: pages are removed from the kernel's direct map, ordinary `get_user_pages` access is blocked, the memory is locked like `mlock`, and hibernation is inhibited while it's in use — a natural sequel to this step, but you'd call it via `libc::syscall` or a dedicated wrapper today. It's still not a magic root boundary, though: the man page itself notes that a sufficiently privileged attacker can spawn a process and exfiltrate the contents via `ptrace`. (It's also off by default before Linux 6.5, when it needed the `secretmem.enable=y` kernel parameter; enabled by default from 6.5 on.)
-- **[`secmem-alloc`](https://crates.io/crates/secmem-alloc)** — different shape: a custom allocator you plug into `Box::new_in` / `Vec::new_in` so every allocation in a secret-bearing region gets `mlock` + zeroize-on-dealloc by default. No `mprotect` bracket, but a much lower per-key cost than a dedicated page.
-
-And then the one *not* to reach for here: **[`secrecy`](https://docs.rs/secrecy)** is explicitly *only* zeroize + a `Debug`-redacted `ExposeSecret` wrapper — no `mlock`, no `mprotect`, no `MADV_DONTDUMP`. It's a good ergonomic top-layer over any of the above, but it doesn't replace them.
-
-The reason all of this is tucked behind *"going further"* rather than the recommended baseline is the threat-model shift: it's a tool for a different problem than the rest of this post.
-
-A working version of both `HardenedKey` and `PageProtectedKey` (with the real `unsafe { ... }` blocks the `region` crate's `protect` API actually requires, and pinned crate versions) is in [`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening). `cargo run --release` prints two matching checksums; the `live`, `live-hardened`, `live-page-protected`, `crash`, and `crash-hardened` modes run the demos from "Trying it" above and this section.
-
 ## Where this leaves us
 
-Stacked up, these controls shrink the window in which your secret is recoverable: off the swap file, out of crash dumps, away from same-user snooping, and — at the cost of a page per key — out of reach of accidental in-process reads. For a lot of keys that's enough.
+Stacked up, these controls shrink the window in which your secret is recoverable: off the swap file, out of crash dumps, away from same-user snooping. For a lot of keys that's enough.
 
-But every knob here quietly assumes the plaintext key is sitting in *your* process's RAM — and as the `PageProtectedKey` caveat made clear, any code sharing your address space can undo your protections. The next post makes that assumption false without special hardware: privilege separation moves the key into a separate process that your dependencies can't reach, and the Linux kernel keyring keeps it in kernel memory where no pointer can follow.
+Two gaps remain, and they each get a post of their own. First, nothing above stops *your own process* from reading the key by accident — a stray pointer, an out-of-bounds read, an errant log statement all walk right past `mlock` and `prctl`. The next post gives the key a dedicated page and seals it behind `mprotect(PROT_NONE)`, so a stray touch crashes instead of leaking. And further out: every knob here quietly assumes the plaintext key is sitting in *your* process's RAM, where any code sharing your address space can undo your protections. Privilege separation and the Linux kernel keyring make that assumption false — that's where the series ends up.
 
 ← Previous: [I Zeroized My Secret. Or Did I?](/zeroize)
-<!-- → Next: TODO -->
+<!-- → Next: [Seal the Key Behind PROT_NONE](/zeroize-page-protected) — uncomment when published -->
 
 ---
 
@@ -508,9 +325,6 @@ But every knob here quietly assumes the plaintext key is sitting in *your* proce
 - `os-memlock` — mlock + MADV_DONTDUMP — <https://docs.rs/os-memlock>
 - `rlimit` — <https://docs.rs/rlimit>
 - `prctl` — <https://docs.rs/prctl>
-- `secrets` — guarded-memory API with libsodium integration (`SecretBox` / `SecretVec`, the recommended way to use the page-isolated pattern in production) — <https://crates.io/crates/secrets>
-- `memsec` — a Rust port of libsodium's secure-allocation primitives (`malloc`, `mlock`, `mprotect`, `memzero`) — <https://docs.rs/memsec>
-- `secmem-alloc` — secret-memory custom allocator for `Box::new_in` / `Vec::new_in` — <https://crates.io/crates/secmem-alloc>
 - `secrecy` — ergonomic `Secret<T>` / `ExposeSecret` (zeroize + `Debug` redaction *only* — no mlock/mprotect/MADV) — <https://docs.rs/secrecy>
 
 **Kernel and libc docs**
@@ -518,9 +332,6 @@ But every knob here quietly assumes the plaintext key is sitting in *your* proce
 - `core(5)` — <https://man7.org/linux/man-pages/man5/core.5.html>
 - `mlock(2)` — <https://man7.org/linux/man-pages/man2/mlock.2.html>
 - `madvise(2)` — <https://man7.org/linux/man-pages/man2/madvise.2.html>
-- `mprotect(2)` — <https://man7.org/linux/man-pages/man2/mprotect.2.html>
 - `prctl(2)` — <https://man7.org/linux/man-pages/man2/prctl.2.html>
 - `ptrace(2)` — <https://man7.org/linux/man-pages/man2/ptrace.2.html>
-- `memfd_secret(2)` — Linux ≥ 5.14, kernel-level secret memory beyond what `mlock`/`mprotect` reach — <https://man7.org/linux/man-pages/man2/memfd_secret.2.html>
 - Yama / `ptrace_scope` — <https://docs.kernel.org/admin-guide/LSM/Yama.html>
-- libsodium guarded heap allocation (the production-grade version of the page-isolated pattern, with guard pages and a canary) — <https://doc.libsodium.org/memory_management> · source: [`src/libsodium/sodium/utils.c`](https://github.com/jedisct1/libsodium/blob/master/src/libsodium/sodium/utils.c) (`sodium_malloc` / `sodium_mprotect_noaccess` / `sodium_mprotect_readonly` / `sodium_mprotect_readwrite`)
