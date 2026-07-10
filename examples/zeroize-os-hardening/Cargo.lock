@@ -230,6 +230,7 @@ dependencies = [
 name = "zeroize-os-hardening"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "os-memlock",
  "prctl",
  "region",

@@ -8,8 +8,9 @@
 //!   coverage comes from the process-wide `RLIMIT_CORE = 0` +
 //!   `PR_SET_DUMPABLE`.
 //! * `PageProtectedKey` — dedicated page via `region::alloc`, locked,
-//!   `MADV_DONTDUMP`'d, kept `PROT_NONE` at rest, briefly flipped to
-//!   `PROT_READ` inside `with_readable`.
+//!   `MADV_DONTDUMP`'d, `MADV_WIPEONFORK`'d (a forked child sees zeros),
+//!   kept `PROT_NONE` at rest, briefly flipped to `PROT_READ` inside
+//!   `with_readable`.
 //!
 //! And one process-level startup helper:
 //!
@@ -181,6 +182,16 @@ impl PageProtectedKey {
         unsafe {
             os_memlock::madvise_dontdump(ptr as *mut c_void, len)?;
         }
+        // Linux ≥ 4.14: a forked child sees this page zero-filled, so the
+        // secret never exists in any child address space. This matters because
+        // mlock is NOT inherited across fork(2) — a child's copy-on-write copy
+        // of the page would be swappable even while the parent's stays pinned.
+        // SAFETY: same live, owned, page-aligned mapping.
+        unsafe {
+            if libc::madvise(ptr as *mut c_void, len, libc::MADV_WIPEONFORK) != 0 {
+                return Err(io::Error::last_os_error());
+            }
+        }
 
         // Guard against `init` panicking before `Self` exists: without this,
         // an early unwind would drop `lock` then `alloc` (munmap) without
@@ -309,7 +320,16 @@ fn print_vmlck(pid: u32) {
 
 /// Default: run both key types, print matching checksums.
 fn run_checksums() -> io::Result<()> {
-    let _ = harden_process();
+    // Check the status instead of `let _ = ...` — the post calls the silent
+    // discard out as the shape to avoid, and the default mode shouldn't be
+    // the one place that does it anyway.
+    let status = harden_process();
+    if !status.fully_hardened() {
+        eprintln!(
+            "warn: not fully hardened (core_dumps_disabled={}, non_dumpable={})",
+            status.core_dumps_disabled, status.non_dumpable
+        );
+    }
 
     println!("=== HardenedKey (Box + mlock) ===");
     {
@@ -318,7 +338,9 @@ fn run_checksums() -> io::Result<()> {
         println!("  checksum = 0x{sum:016x}");
     }
 
-    println!("=== PageProtectedKey (region::alloc + mlock + MADV_DONTDUMP + mprotect) ===");
+    println!(
+        "=== PageProtectedKey (region::alloc + mlock + MADV_DONTDUMP + MADV_WIPEONFORK + mprotect) ==="
+    );
     {
         let mut key = PageProtectedKey::load(load_demo_key)?;
         let sum = key.with_readable(fake_sign)?;

@@ -84,6 +84,7 @@ A couple of honest heads-ups, because `mlock` has sharp edges:
 
 - **It can silently fail.** A process may only lock up to its `RLIMIT_MEMLOCK` limit (`ulimit -l`), which on many systemd setups is a modest few megabytes. Go over it and `mlock` returns `ENOMEM`. So check the return value — a "locked" buffer that didn't actually lock is worse than knowing you couldn't. You can read or raise the limit (within your hard cap) with the `rlimit` crate.
 - **It stops swapping, not hibernation.** Suspend-to-disk snapshots *all* of RAM — locked pages included — into the hibernation image. Covering that means an encrypted hibernation image or no hibernation at all; it isn't something your process can fix on its own.
+- **Locks don't survive `fork`.** Memory locks are not inherited by a child created via `fork(2)` — the child's copy-on-write copy of the secret page is *swappable*, even while the parent's stays pinned. Any dependency that spawns a subprocess the classic way (`fork` + `exec`) briefly duplicates your secret into an unlocked address space. So load keys *after* any daemonizing or forking setup, and treat "fork while a key is live" as a leak — or use the page-isolated variant later in this post, which can tell the kernel to hand the child a zero-filled page instead (`MADV_WIPEONFORK`).
 - **On a swapless host it buys less secrecy value.** Plenty of servers and containers run with no disk swap at all, or only compressed `zram` that never touches disk; there, `mlock`'s swap protection has no disk path to block. It still pins pages, consumes the `RLIMIT_MEMLOCK` budget, and can fail — so keep checking the return value — and it's cheap insurance where swap *does* exist. Just don't read "I called `mlock`" as "my secret can't reach disk," because hibernation (above) still can.
 - **Windows differs.** `VirtualLock` keeps pages in the working set, but the working-set model has its own quirks; treat the cross-platform wrapper as best-effort and test on each target.
 
@@ -149,7 +150,7 @@ What this earns us:
 - **Field-order drop semantics — with an honest caveat.** Rust drops a struct's fields in declaration order, so `bytes` (first) is wiped before `_lock` (second) releases the pin. For `HardenedKey` this is tidiness more than safety: `munlock` doesn't evict the page, and the `Box` stays mapped until it drops last, so the `Zeroizing` wipe lands on the same resident bytes whichever order you pick. Keep `bytes` first as a clean default — but note that field order stops being cosmetic in `PageProtectedKey` below, where `munlock` genuinely *must* precede `munmap`, and reversing it really is a bug. This ordering only covers the fully-constructed value, though: if `init` panics *before* `HardenedKey` exists, there's no `Self` yet for field order to apply to, so ordinary local-variable drop order takes over instead — `lock` (declared second, in `load`'s own locals) unwinds before `bytes`, meaning the page can be unlocked a moment before the wipe runs. Treat the closure as non-panicking, or add a construction-time guard if that unwind window matters to your threat model.
 - **You can't accidentally leak one of the two.** Bytes and lock are wired together — there's no path where one outlives the other or gets forgotten on an early return.
 - **The move hazard from part 1 is genuinely gone.** Moving a `HardenedKey` moves the `Box` pointer and the `LockGuard` handle, not the 32 bytes; the heap allocation stays put, and the lock keeps pointing at the same page.
-- **Locks don't stack, and the page isn't exclusively ours.** Linux tracks `mlock` as a `VM_LOCKED` bit on the VMA covering the (page-rounded) range, not a per-page refcount per caller — so if two `HardenedKey`s happen to land on the same heap page, dropping one can `munlock` the page while the other key is still live. The page may also hold allocator metadata or unrelated heap data that gets pinned along for the ride. That's an acceptable baseline cost for a 32-byte key, but it's another reason page-isolated allocations (below) are cleaner for higher assurance.
+- **Locks don't stack, and the page isn't exclusively ours.** Linux tracks `mlock` as a `VM_LOCKED` bit on the VMA covering the (page-rounded) range, not a per-page refcount per caller — so if two `HardenedKey`s happen to land on the same heap page, dropping one can `munlock` the page while the other key is still live. The page may also hold allocator metadata or unrelated heap data that gets pinned along for the ride. That's an acceptable baseline cost for a *single* 32-byte key — but with a modern allocator packing small allocations, two keys sharing a page is the likely case, not a corner case, and the failure is silent: `VmLck` drops to zero and nothing in the program can tell. If your process holds more than one `HardenedKey` at a time, assume they collide, and use the page-isolated variant below (or the `secrets` crate) instead — there every key owns its page, so one key's unlock can't strip another's protection.
 
 (Types and crate versions are simplified — see [`examples/zeroize-os-hardening`](https://github.com/f-squirrel/f-squirrel.github.io/tree/master/examples/zeroize-os-hardening) for a buildable version pinned to real crate versions.)
 
@@ -207,10 +208,11 @@ fn harden_process() -> HardenStatus {
 fn main() -> std::io::Result<()> {
     let status = harden_process();                // once, at startup
     if !status.fully_hardened() {
-        eprintln!(
-            "warn: not fully hardened (core_dumps_disabled={}, non_dumpable={})",
+        // Fail closed: don't load secrets into a process that couldn't harden.
+        return Err(std::io::Error::other(format!(
+            "hardening failed (core_dumps_disabled={}, non_dumpable={}); refusing to load key",
             status.core_dumps_disabled, status.non_dumpable
-        );
+        )));
     }
     let key = HardenedKey::load(load_key_from_kms)?;
     crypto_op(key.as_bytes());
@@ -218,7 +220,7 @@ fn main() -> std::io::Result<()> {
 }
 ```
 
-A misconfigured environment now produces a process that *says* it isn't fully hardened, instead of one that silently looks fine and isn't.
+A misconfigured environment now produces a process that *refuses to load the key*, instead of one that silently looks fine and isn't. Whether to fail closed like this or to warn and continue is a deployment-policy call — a batch job sitting behind three other layers of defence might reasonably log and carry on — but make that call deliberately, in one visible place. The shape to avoid is the accidental version: a warning line nobody reads followed by business as usual, which quietly downgrades your hardening to log-only in exactly the environments (restricted seccomp profiles, unusual containers) where you most wanted to know.
 
 For a system-wide policy there's the Yama LSM, via `/proc/sys/kernel/yama/ptrace_scope`:
 
@@ -361,11 +363,23 @@ impl PageProtectedKey {
         let ptr: *const u8 = alloc.as_ptr::<u8>();
         let len: usize = alloc.len(); // page-rounded (typically 4096)
 
-        // 2. Pin and exclude-from-dumps — same controls as earlier, just on a
-        //    whole page instead of a corner of one.
+        // 2. Pin, exclude from dumps, and wipe-on-fork. The first two are the
+        //    same controls as earlier, just on a whole page instead of a
+        //    corner of one; the third is new — and only possible here, because
+        //    madvise needs the page-aligned address a Box can't give us.
         let _lock = region::lock(ptr, len).map_err(io_err)?;
         // SAFETY: ptr/len describe a live, owned, page-aligned mmap region.
         unsafe { os_memlock::madvise_dontdump(ptr as *mut c_void, len)?; }
+        // Linux ≥ 4.14: a forked child sees this page zero-filled, so the
+        // secret never exists in any child address space. This matters because
+        // mlock is NOT inherited across fork(2) — a child's copy-on-write copy
+        // of the page would be swappable even while the parent's stays pinned.
+        // SAFETY: same live, owned, page-aligned mapping.
+        unsafe {
+            if libc::madvise(ptr as *mut c_void, len, libc::MADV_WIPEONFORK) != 0 {
+                return Err(io::Error::last_os_error());
+            }
+        }
 
         // 2.5. Guard the unwind path: if `init` panics before `Self` exists,
         // ordinary local drop order would unlock and unmap the page without
