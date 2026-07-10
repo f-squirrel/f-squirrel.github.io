@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "zeroize-demo",
+    "zeroize-os-hardening",
+]
+
+resolver = "2"
