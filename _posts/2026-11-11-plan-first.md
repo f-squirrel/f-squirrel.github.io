@@ -41,10 +41,6 @@ So keep the feedback and move it. **Use cheap code to learn, then plan, then use
 
 You still iterate, but on the spec instead of the code.
 
-## Where this matters most
-
-In my own field, a bug in a cold or MPC wallet can lose funds, and "it passed the demo" isn't evidence of anything. There the spec (threat model, protocol, invariants) is the real product, and the code is a derivation of it. [Spec-driven tooling like GitHub Spec Kit](https://github.com/github/spec-kit) points the same way.
-
 ## The fair objections
 
 - **"Requirements are never known upfront."** True, which is why step 1 exists. If you can't write the spec, you haven't finished learning.
