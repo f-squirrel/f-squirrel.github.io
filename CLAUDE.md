@@ -23,7 +23,7 @@ There is no separate lint or test command. Markdown linting rules are defined in
 
 ## Content Structure
 
-**New posts** go in `_posts/` as `YYYY-MM-DD-slug-title.md`. Front matter fields used across existing posts:
+**New posts** go in `_posts/` as `YYYY-MM-DD-slug-title.md`. Only posts merged into the default branch (`master`) are published and visible to readers — drafts and work on other branches are not live until merged. Front matter fields used across existing posts:
 
 ```yaml
 ---
